@@ -5,7 +5,6 @@ on:
   push:
     branches: master
     paths-ignore:
-      - '.github/**' # Ignore changes towards the .github directory
       - 'build_output/**' # Ignore changes towards the build_output directory
       - '**.md' # Do no build if *.md files changes
 
@@ -49,18 +48,20 @@ jobs:
           SECRET_LATITUDE: ${{ secrets.LATITUDE }}
           SECRET_LONGITUDE: ${{ secrets.LONGITUDE }}
         run: |
-          sed -i 's=SMUDGE_SECRET_FTP_SERVER=$SECRET_FTP_SERVER=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_FTP_USERNAME=$SECRET_FTP_USERNAME=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_FTP_PASSWORD=$SECRET_FTP_PASSWORD=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_SERVER_DIR=$SECRET_SERVER_DIR=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_STA_SSID1=$SECRET_STA_SSID1=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_STA_PASS1=$SECRET_STA_PASS1=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_MQTT_HOST=$SECRET_MQTT_HOST=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_MQTT_PORT=$SECRET_MQTT_PORT=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_MQTT_USER=$SECRET_MQTT_USER=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_MQTT_PASS=$SECRET_MQTT_PASS=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_LATITUDE=$SECRET_LATITUDE=' tasmota/user_config_override.h
-          sed -i 's=SMUDGE_SECRET_LONGITUDE=$SECRET_LONGITUDE=' tasmota/user_config_override.h
+          echo -e "Replacing smudges with environment variables"
+          sed -i "s=SMUDGE_SECRET_FTP_SERVER=$SECRET_FTP_SERVER=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_FTP_USERNAME=$SECRET_FTP_USERNAME=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_FTP_PASSWORD=$SECRET_FTP_PASSWORD=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_SERVER_DIR=$SECRET_SERVER_DIR=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_STA_SSID1=$SECRET_STA_SSID1=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_STA_PASS1=$SECRET_STA_PASS1=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_MQTT_HOST=$SECRET_MQTT_HOST=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_MQTT_PORT=$SECRET_MQTT_PORT=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_MQTT_USER=$SECRET_MQTT_USER=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_MQTT_PASS=$SECRET_MQTT_PASS=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_LATITUDE=$SECRET_LATITUDE=" tasmota/user_config_override.h
+          sed -i "s=SMUDGE_SECRET_LONGITUDE=$SECRET_LONGITUDE=" tasmota/user_config_override.h
+          echo
 
           echo -e "Building minimal"
           echo
