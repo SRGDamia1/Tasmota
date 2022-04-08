@@ -385,8 +385,13 @@ bool SettingsBufferAlloc(void) {
 
 String SettingsConfigFilename(void) {
   char filename[TOPSZ];
-  char hostname[sizeof(TasmotaGlobal.hostname)];
-  snprintf_P(filename, sizeof(filename), PSTR("Config_%s_%s.dmp"), NoAlNumToUnderscore(hostname, TasmotaGlobal.hostname), TasmotaGlobal.version);
+  // char hostname[sizeof(TasmotaGlobal.hostname)];
+  // snprintf_P(filename, sizeof(filename), PSTR("Config_%s_%s.dmp"), NoAlNumToUnderscore(hostname, TasmotaGlobal.hostname), TasmotaGlobal.version);
+
+  // WebGetConfig http://myserver:8000/tasmota/conf/config_%id%.dmp where %id% is expanded to device mac address
+  String fileMacAddress = WiFi.macAddress();
+  fileMacAddress.replace(":", "");
+  snprintf_P(filename, sizeof(filename), PSTR("config_%s.dmp"), fileMacAddress.c_str());
   return String(filename);
 }
 

@@ -34,80 +34,6 @@
  *   - All parameters can be persistent changed online using commands via MQTT, WebConsole or Serial.
 \*****************************************************************************************************/
 
-/*
-Examples :
-
-// -- Master parameter control --------------------
-#undef  CFG_HOLDER
-#define CFG_HOLDER        4617                   // [Reset 1] Change this value to load SECTION1 configuration parameters to flash
-
-// -- Setup your own Wifi settings  ---------------
-#undef  STA_SSID1
-#define STA_SSID1         "YourSSID"             // [Ssid1] Wifi SSID
-
-#undef  STA_PASS1
-#define STA_PASS1         "YourWifiPassword"     // [Password1] Wifi password
-
-// -- Setup your own MQTT settings  ---------------
-#undef  MQTT_HOST
-#define MQTT_HOST         "your-mqtt-server.com" // [MqttHost]
-
-#undef  MQTT_PORT
-#define MQTT_PORT         1883                   // [MqttPort] MQTT port (10123 on CloudMQTT)
-
-#undef  MQTT_USER
-#define MQTT_USER         "YourMqttUser"         // [MqttUser] Optional user
-
-#undef  MQTT_PASS
-#define MQTT_PASS         "YourMqttPass"         // [MqttPassword] Optional password
-
-// You might even pass some parameters from the command line ----------------------------
-// Ie:  export PLATFORMIO_BUILD_FLAGS='-DUSE_CONFIG_OVERRIDE -DMY_IP="192.168.1.99" -DMY_GW="192.168.1.1" -DMY_DNS="192.168.1.1"'
-
-#ifdef MY_IP
-#undef  WIFI_IP_ADDRESS
-#define WIFI_IP_ADDRESS     MY_IP                // Set to 0.0.0.0 for using DHCP or enter a static IP address
-#endif
-
-#ifdef MY_GW
-#undef  WIFI_GATEWAY
-#define WIFI_GATEWAY        MY_GW                // if not using DHCP set Gateway IP address
-#endif
-
-#ifdef MY_DNS
-#undef  WIFI_DNS
-#define WIFI_DNS            MY_DNS               // If not using DHCP set DNS IP address (might be equal to WIFI_GATEWAY)
-#endif
-
-#ifdef MY_DNS2
-#undef  WIFI_DNS2
-#define WIFI_DNS2           MY_DNS2              // If not using DHCP set DNS IP address (might be equal to WIFI_GATEWAY)
-#endif
-
-// !!! Remember that your changes GOES AT THE BOTTOM OF THIS FILE right before the last #endif !!!
-*/
-
-// -- Setup your own Wifi settings  ---------------
-#undef  STA_SSID1
-#define STA_SSID1         "SMUDGE_SECRET_STA_SSID1"  // [Ssid1] Wifi SSID
-
-#undef  STA_PASS1
-#define STA_PASS1         "SMUDGE_SECRET_STA_PASS1"  // [Password1] Wifi password
-
-// -- Setup your own MQTT settings  ---------------
-#undef  MQTT_HOST
-#define MQTT_HOST         "SMUDGE_SECRET_MQTT_HOST"  // [MqttHost]
-
-#undef  MQTT_PORT
-#define MQTT_PORT         SMUDGE_SECRET_MQTT_PORT    // [MqttPort] MQTT port (10123 on CloudMQTT)
-
-#undef  MQTT_USER
-#define MQTT_USER         "SMUDGE_SECRET_MQTT_USER"  // [MqttUser] Optional user
-
-#undef  MQTT_PASS
-#define MQTT_PASS         "SMUDGE_SECRET_MQTT_PASS"  // [MqttPassword] Optional password
-
-
 // -- Project -------------------------------------
 
 // If not selected the default will be Sonoff Mini Template
@@ -125,6 +51,35 @@ Examples :
 #define FALLBACK_MODULE WEMOS                                                                                                                                // [Module2] Select default module on fast reboot where USER_MODULE is user template
 #define USER_TEMPLATE "{\"NAME\":\"ESP32-DevKit\",\"GPIO\":[1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,0,1,1,1,0,1,1,1,0,0,0,0,1,1,1,1,1,0,0,1],\"FLAG\":0,\"BASE\":1}" // [Template] Set JSON template
 #endif                                                                                                                                                       // ESP32
+
+// -- Wi-Fi ---------------------------------------
+#undef STA_SSID1
+#define STA_SSID1 "SMUDGE_SECRET_STA_SSID1" // [Ssid1] Wifi SSID
+
+#undef STA_PASS1
+#define STA_PASS1 "SMUDGE_SECRET_STA_PASS1" // [Password1] Wifi password
+
+// -- Ota -----------------------------------------
+#undef OTA_URL
+#ifdef ESP8266
+#define OTA_URL "http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/firmware/tasmota.bin.gz" // [OtaUrl]
+#endif                                                                                  // ESP8266
+#ifdef ESP32
+#define OTA_URL "http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/firmware/tasmota32.bin" // [OtaUrl]
+#endif                                                                                 // ESP32
+
+// -- MQTT ----------------------------------------
+#undef MQTT_HOST
+#define MQTT_HOST "SMUDGE_SECRET_MQTT_HOST" // [MqttHost]
+
+#undef MQTT_PORT
+#define MQTT_PORT SMUDGE_SECRET_MQTT_PORT // [MqttPort] MQTT port (10123 on CloudMQTT)
+
+#undef MQTT_USER
+#define MQTT_USER "SMUDGE_SECRET_MQTT_USER" // [MqttUser] Optional user
+
+#undef MQTT_PASS
+#define MQTT_PASS "SMUDGE_SECRET_MQTT_PASS" // [MqttPassword] Optional password
 
 // -- Time - Start Daylight Saving Time and timezone offset from UTC in minutes
 #undef TIME_DST_HEMISPHERE
@@ -156,9 +111,9 @@ Examples :
 
 // -- Location ------------------------------------
 #undef LATITUDE
-#define LATITUDE               SMUDGE_SECRET_LATITUDE   // [Latitude] Your location to be used with sunrise and sunset
+#define LATITUDE SMUDGE_SECRET_LATITUDE // [Latitude] Your location to be used with sunrise and sunset
 #undef LONGITUDE
-#define LONGITUDE              SMUDGE_SECRET_LONGITUDE  // [Longitude] Your location to be used with sunrise and sunset
+#define LONGITUDE SMUDGE_SECRET_LONGITUDE // [Longitude] Your location to be used with sunrise and sunset
 
 #undef APP_TIMEZONE
 #define APP_TIMEZONE 99 // [Timezone] +1 hour (Amsterdam) (-13 .. 14 = hours from UTC, 99 = use TIME_DST/TIME_STD)
@@ -239,11 +194,14 @@ Examples :
 #define USE_RULES            // Add support for rules (+8k code)
 #define USE_EXPRESSION       // Add support for expression evaluation in rules (+3k2 code, +64 bytes mem)
 #define SUPPORT_IF_STATEMENT // Add support for IF statement in rules (+4k2 code, -332 bytes mem)
+
 //  #define USER_RULE1 "<Any rule1 data>"          // Add rule1 data saved at initial firmware load or when command reset is executed
 //  #define USER_RULE2 "<Any rule2 data>"          // Add rule2 data saved at initial firmware load or when command reset is executed
 //  #define USER_RULE3 "<Any rule3 data>"          // Add rule3 data saved at initial firmware load or when command reset is executed
 
-#define USER_BACKLOG "WebGetConfig SMUDGE_SECRET_SERVER_DIR/configuration/%id%.dmp"  // Add commands executed at firmware load or when command reset is executed
+#define USE_WEBGETCONFIG // Enable restoring config from external webserver (+0k6)
+
+#define USER_BACKLOG "WebGetConfig http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/configuration/config_%id%.dmp" // Add commands executed at firmware load or when command reset is executed
 #endif
 
 // -- Emulation for Alexa ---------------------
