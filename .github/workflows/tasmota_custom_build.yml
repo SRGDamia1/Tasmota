@@ -35,7 +35,33 @@ jobs:
           pip install -U platformio
 
       - name: Run PlatformIO
+        env:
+          SECRET_FTP_SERVER: ${{ secrets.FTP_SERVER }}
+          SECRET_FTP_USERNAME: ${{ secrets.FTP_USERNAME }}
+          SECRET_FTP_PASSWORD: ${{ secrets.FTP_PASSWORD }}
+          SECRET_SERVER_DIR: ${{ secrets.SERVER_DIR }}
+          SECRET_STA_SSID1: ${{ secrets.STA_SSID1 }}
+          SECRET_STA_PASS1: ${{ secrets.STA_PASS1 }}
+          SECRET_MQTT_HOST: ${{ secrets.MQTT_HOST }}
+          SECRET_MQTT_PORT: ${{ secrets.MQTT_PORT }}
+          SECRET_MQTT_USER: ${{ secrets.MQTT_USER }}
+          SECRET_MQTT_PASS: ${{ secrets.MQTT_PASS }}
+          SECRET_LATITUDE: ${{ secrets.LATITUDE }}
+          SECRET_LONGITUDE: ${{ secrets.LONGITUDE }}
         run: |
+          sed -i 's=SMUDGE_SECRET_FTP_SERVER=$SECRET_FTP_SERVER=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_FTP_USERNAME=$SECRET_FTP_USERNAME=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_FTP_PASSWORD=$SECRET_FTP_PASSWORD=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_SERVER_DIR=$SECRET_SERVER_DIR=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_STA_SSID1=$SECRET_STA_SSID1=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_STA_PASS1=$SECRET_STA_PASS1=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_MQTT_HOST=$SECRET_MQTT_HOST=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_MQTT_PORT=$SECRET_MQTT_PORT=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_MQTT_USER=$SECRET_MQTT_USER=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_MQTT_PASS=$SECRET_MQTT_PASS=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_LATITUDE=$SECRET_LATITUDE=' tasmota/user_config_override.h
+          sed -i 's=SMUDGE_SECRET_LONGITUDE=$SECRET_LONGITUDE=' tasmota/user_config_override.h
+
           echo -e "Building minimal"
           echo
           platformio run -e tasmota-minimal

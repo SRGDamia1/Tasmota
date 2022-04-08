@@ -39,3 +39,4 @@ secrets
 *.bak
 *.code-workspace
 .history
+filters
