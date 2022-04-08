@@ -20,4 +20,4 @@
 *.be linguist-language=Python
 
 #smudge and clean
-tasmota/user_config_override.h filter=updateUsersAndPasses
+tasmota/user_config_override.h filter=smudge_secrets
