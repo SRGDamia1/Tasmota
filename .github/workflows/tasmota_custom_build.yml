@@ -1,0 +1,75 @@
+name: build_custom_firmware
+
+on:
+  workflow_dispatch: # Manually start a workflow
+  push:
+    branches: master
+    paths-ignore:
+      - '.github/**' # Ignore changes towards the .github directory
+      - 'build_output/**' # Ignore changes towards the build_output directory
+      - '**.md' # Do no build if *.md files changes
+
+# Ensures that only one deploy task per branch/environment will run at a time.
+concurrency:
+  group: ${{ github.ref }}-${{ github.workflow }}
+  cancel-in-progress: true
+
+jobs:
+  base-images:
+    runs-on: ubuntu-latest
+    if: github.repository == 'SRGDamia1/Tasmota' && !contains(github.event.head_commit.message, 'ci skip')
+
+    steps:
+      - uses: actions/checkout@v2
+        # with:
+        #   ref: master
+        #   submodules: false
+        #   persist-credentials: false # otherwise, the token used is the GITHUB_TOKEN, instead of your personal token
+        #   fetch-depth: 0 # otherwise, you will fail to push refs to dest repo
+
+      - name: Set up Python
+        uses: actions/setup-python@v1
+
+      - name: Install dependencies
+        run: |
+          pip install -U platformio
+
+      - name: Run PlatformIO
+        run: |
+          echo -e "Building minimal"
+          echo
+          platformio run -e tasmota-minimal
+          echo
+          echo -e "Building Tasmota"
+          echo
+          platformio run -e tasmota
+          echo
+          echo -e "Building Tasmota32"
+          platformio run -e tasmota32
+
+      - name: Upload Build Files
+        uses: SamKirkland/FTP-Deploy-Action@4.3.0
+        with:
+          local-dir: build_output/
+          server: ${{ secrets.FTP_SERVER }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          port: 21
+          server-dir: ${{ secrets.SERVER_DIR }}
+          log-level: verbose
+
+      # - name: Commit built firmware
+      #   run: |
+      #     git config --global user.email "sdamiano@stroudcenter.org"
+      #     git config --global user.name "SRGDamia1"
+      #     git config --global push.default simple
+      #     git config pull.ff only
+      #     git add -A
+      #     git commit -m "Built new firmware (${{ github.workflow }} ${{ github.event_name }} ${{ github.run_number }} ) [ci skip]";
+      #     git pull
+
+      # - name: Push changes to master
+      #   uses: ad-m/github-push-action@master
+      #   with:
+      #     github_token: ${{ secrets.SARA_PUSH_TOKEN }}
+      #     branch: master

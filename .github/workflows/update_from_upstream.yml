@@ -1,0 +1,59 @@
+name: 'Usptream Sync'
+
+on:
+  schedule:
+    - cron: '0 17 * * 5'
+    # scheduled at 17:00 every Friday
+
+  workflow_dispatch: # click the button on Github repo!
+
+jobs:
+  sync_latest_from_upstream:
+    runs-on: ubuntu-latest
+    name: Sync latest commits from upstream repo
+
+    steps:
+      # REQUIRED step
+      # Step 1: run a standard checkout action, provided by github
+      - name: Checkout target repo
+        uses: actions/checkout@v2
+
+      # REQUIRED step
+      # Run the sync action on master
+      - name: Sync upstream changes
+        id: sync_master
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.2
+        with:
+          target_sync_branch: master
+          # REQUIRED 'target_repo_token' exactly like this!
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_sync_branch: master
+          upstream_sync_repo: arendst/Tasmota
+          shallow_since: 1 week 1 hour ago
+
+      # Run the sync action on development
+      - name: Sync upstream changes
+        id: sync_development
+        uses: aormsby/Fork-Sync-With-Upstream-action@v3.2
+        with:
+          target_sync_branch: development
+          # REQUIRED 'target_repo_token' exactly like this!
+          target_repo_token: ${{ secrets.GITHUB_TOKEN }}
+          upstream_sync_branch: development
+          upstream_sync_repo: arendst/Tasmota
+          shallow_since: 1 week 1 hour ago
+
+      # Step 3: Display a message based on the sync output var 'has_new_commits'
+      - name: New commits found on master
+        if: steps.sync_master.outputs.has_new_commits == 'true'
+        run: echo "New commits were found to sync on master branch."
+      - name: New commits found on development
+        if: steps.sync_development.outputs.has_new_commits == 'true'
+        run: echo "New commits were found to sync on development branch."
+
+      - name: No new commits on master
+        if: steps.sync_master.outputs.has_new_commits == 'false'
+        run: echo "There were no new commits on master branch."
+      - name: No new commits development
+        if: steps.sync_development.outputs.has_new_commits == 'false'
+        run: echo "There were no new commits on development branch."
