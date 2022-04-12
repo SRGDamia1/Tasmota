@@ -134,10 +134,12 @@
 
 #ifdef ESP8266
 #define MQTT_GRPTOPIC "tasmotas" // [GroupTopic] MQTT Group topic
+// #define MQTT_GRPTOPIC "tasmesh" // [GroupTopic] MQTT Group topic
 #endif                           // ESP8266
 
 #ifdef ESP32
-#define MQTT_GRPTOPIC "tasmotas32" // [GroupTopic] MQTT Group topic
+#define MQTT_GRPTOPIC "tasmotas" // [GroupTopic] MQTT Group topic
+// #define MQTT_GRPTOPIC "tasmotas32" // [GroupTopic] MQTT Group topic
 #endif                             // ESP32
 
 #undef MQTT_POWER_FORMAT
