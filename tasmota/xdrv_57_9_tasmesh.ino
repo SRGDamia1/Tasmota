@@ -657,7 +657,9 @@ void MESHevery50MSecond(void) {
 
 
 /**
- * @brief Used to check status and keep everyone in line.
+ * @brief Used to check status and health of the mesh.
+ *
+ * Requests regular topic updates from the nodes and removes them from the peer list if they have been gone for too long.
  */
 void MESHEverySecond(void) {
   static uint32_t _second = 0;  // NOTE: static, not reinitialized every time fxn is run
@@ -701,33 +703,38 @@ void MESHEverySecond(void) {
 
 #else  // ESP8266
 
+/**
+ * @brief This is used for lower-priority prosessing of mesh action queues.
+ * On each iteration, handle the packets in the front of the packetToResend and packetToConsume vectors.
+ */
 void MESHevery50MSecond(void) {
   if (ROLE_NONE == MESH.role) { return; }
 
-  if (MESH.packetToResend.size() > 0) {
+  if (MESH.packetToResend.size() > 0) {  // handle packets to resend
     AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Next packet %d to resend of type %u, TTL %u"),
       MESH.packetToResend.size(), MESH.packetToResend.front().type, MESH.packetToResend.front().TTL);
-    if (MESH.packetToResend.front().TTL > 0) {
+    if (MESH.packetToResend.front().TTL > 0) {  // make sure it hasn't exceed time to live
       MESH.packetToResend.front().TTL--;
       if (memcmp(MESH.packetToResend.front().sender, MESH.broker, 6) != 0) { //do not send back the packet to the broker
         MESHsendPacket(&MESH.packetToResend.front());
       }
     } else {
-      MESH.packetToResend.pop();
+      MESH.packetToResend.pop();  // toss the packet if exceeded TTL
     }
     // pass the packets
   }
 
-  if (MESH.packetToConsume.size() > 0) {
+  if (MESH.packetToConsume.size() > 0) {  // handle the next packet to consume
     MESHencryptPayload(&MESH.packetToConsume.front(), 0);
     switch (MESH.packetToConsume.front().type) {
       case PACKET_TYPE_MQTT:
         if (memcmp(MESH.packetToConsume.front().sender, MESH.sendPacket.sender, 6) == 0) {
-          //discard echo
+          //discard echo (ie, a packet sent by me)
           break;
         }
         // AddLog(LOG_LEVEL_INFO, PSTR("MSH: node received topic: %s"), (char*)MESH.packetToConsume.front().payload);
         MESHreceiveMQTT(&MESH.packetToConsume.front());
+        // NOTE:  No receive buffer!! only single packet messages supported!!
         break;
       case PACKET_TYPE_PEERLIST:
         for (uint32_t i = 0; i < MESH.packetToConsume.front().chunkSize; i += 6) {
@@ -739,13 +746,17 @@ void MESHevery50MSecond(void) {
           }
         }
         break;
-      default:
+      default:  // NOTE:  time and topic request packets are handled immediately in the receive callback
         break;
     }
-    MESH.packetToConsume.pop();
+    MESH.packetToConsume.pop(); // remove the packet from the queue
   }
 }
 
+/**
+ * @brief Used to handle requests from the broker to refresh topics and to
+ * deInit the mesh if the broker hasn't been heard from in too long.
+ */
 void MESHEverySecond(void) {
   if (MESH.role > ROLE_BROKER) {
     if (MESH.flags.brokerNeedsTopic == 1) {
@@ -965,7 +976,7 @@ bool Xdrv57(uint8_t function) {
         break;
 #ifdef USE_DEEPSLEEP
       case FUNC_SAVE_BEFORE_RESTART:
-        MESHdeInit();
+        MESHdeInit();  // NOTE: Node must manually re-init on wake (via rule or other method)
         break;
 #endif  // USE_DEEPSLEEP
     }
