@@ -44,6 +44,15 @@
 
 #ifdef ESP32
 
+/**
+ * @brief **ESP32** Call back on sending data - logs the receiver and the status.
+ *
+ * This function is run with high priority on the WiFi task and should not contain any lengthy operations.
+ * https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html#_CPPv417esp_now_send_cb_t
+ *
+ * @param MAC The mac address of the receiver
+ * @param sendStatus The status/result of the send to the receiver
+ */
 void CB_MESHDataSent(const uint8_t *MAC, esp_now_send_status_t sendStatus);
 void CB_MESHDataSent(const uint8_t *MAC, esp_now_send_status_t sendStatus) {
   char _destMAC[18];
@@ -51,6 +60,16 @@ void CB_MESHDataSent(const uint8_t *MAC, esp_now_send_status_t sendStatus) {
   AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Sent to %s status %d"), _destMAC, sendStatus);
 }
 
+/**
+ * @brief **ESP32** Call back on receiving data over the ESP-NOW mesh.
+ *
+ * This function is run with high priority on the WiFi task and should not contain any lengthy operations.
+ * https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html#_CPPv417esp_now_recv_cb_t
+ *
+ * @param MAC The MAC of the peer from which the data came
+ * @param packet A pointer to where the incoming packet is now stored in memory
+ * @param len The length of the incoming packet
+ */
 void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
   static bool _locked = false;
   if (_locked) { return; }
@@ -60,39 +79,45 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
   ToHex_P(MAC, 6, _srcMAC, 18, ':');
   AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rcvd from %s"), _srcMAC);
   mesh_packet_t *_recvPacket = (mesh_packet_t*)packet;
+  // register and refresh node packets from a node have a payload of the MAC of the desired broker followed by their own MQTT topid
   if ((_recvPacket->type == PACKET_TYPE_REGISTER_NODE) || (_recvPacket->type == PACKET_TYPE_REFRESH_NODE)) {
-    if (MESHcheckPeerList((const uint8_t *)MAC) == false) {
-      MESHencryptPayload(_recvPacket, 0); //decrypt it and check
-      if (memcmp(_recvPacket->payload, MESH.broker, 6) == 0) {
-        MESHaddPeer((uint8_t*)MAC);
+    if (MESHcheckPeerList((const uint8_t *)MAC) == false) { // if it's not an already know peer
+      MESHencryptPayload(_recvPacket, 0); //decrypt it and check the payload
+      if (memcmp(_recvPacket->payload, MESH.broker, 6) == 0) {  // if the MAC in the payload matches the MAC of the broker (ie, self on ESP32)
+        MESHaddPeer((uint8_t*)MAC);  // add the new peer
 //        AddLog(LOG_LEVEL_INFO, PSTR("MSH: Rcvd topic %s"), (char*)_recvPacket->payload + 6);
 //        AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize+5);
-        for (auto &_peer : MESH.peers) {
-          if (memcmp(_peer.MAC, _recvPacket->sender, 6) == 0) {
-            strcpy(_peer.topic, (char*)_recvPacket->payload + 6);
-            MESHsubscribe((char*)&_peer.topic);
+        for (auto &_peer : MESH.peers) {  // check all peers on the updated know peer list
+          if (memcmp(_peer.MAC, _recvPacket->sender, 6) == 0) {  // when we read the peer who is the sender of the received packet
+            strcpy(_peer.topic, (char*)_recvPacket->payload + 6);  // copy the node's MQTT topic to our peer list
+            MESHsubscribe((char*)&_peer.topic);  // Subscribe to the peer's topic
             _locked = false;
             return;
           }
         }
-      } else {
+      } else {  // if the broker MAC *doesn't* match ours
+        // decript the message just to log its failure
         char _cryptMAC[18];
         ToHex_P(_recvPacket->payload, 6, _cryptMAC, 18, ':');
         AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Peer %s denied, wrong MAC %s"), _srcMAC, _cryptMAC);
         _locked = false;
         return;
       }
-    } else {
-      if (_recvPacket->type == PACKET_TYPE_REGISTER_NODE) {
+    } else {  // if this *is* a known node
+      if (_recvPacket->type == PACKET_TYPE_REGISTER_NODE) {  //if it's trying to re-register
+        // flag that the node is impatient
         MESH.flags.nodeWantsTimeASAP = 1; //this could happen after wake from deepsleep on battery powered device
       } else {
+        // otherwise, just flag that we need to send the time when we get to it
         MESH.flags.nodeWantsTime = 1;
       }
     }
   }
-  MESH.lmfap = millis();
-  if (MESHcheckPeerList(MAC) == true){
-    MESH.packetToConsume.push(*_recvPacket);
+  // for other types of packets (not register or refresh node)
+  MESH.lmfap = millis();  // update the last reception from a peer time
+  if (MESHcheckPeerList(MAC) == true){  // if this is a known peer
+    // ^^ NOTE:  MESHcheckPeerList will update _peer.lastMessageFromPeer
+    MESH.packetToConsume.push(*_recvPacket);  // add the message to the queue of messages to process
     AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet %d from %s to queue"), MESH.packetToConsume.size(), _srcMAC);
   }
   _locked = false;
@@ -100,23 +125,43 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
 
 #else  // ESP8266
 
+/**
+ * @brief **ESP8266** Call back on sending data - logs the receiver and the status.
+ *
+ * This function is run with high priority on the WiFi task and should not contain any lengthy operations.
+ * https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html#_CPPv417esp_now_send_cb_t
+ *
+ * @param MAC The mac address of the receiver
+ * @param sendStatus The status/result of the send to the receiver
+ */
 void CB_MESHDataSent(uint8_t *MAC, uint8_t sendStatus) {
   char _destMAC[18];
   ToHex_P(MAC, 6, _destMAC, 18, ':');
   AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Sent to %s status %d"), _destMAC, sendStatus);
 }
 
+/**
+ * @brief **ESP8266** Call back on receiving data over the ESP-NOW mesh.
+ *
+ * This function is run with high priority on the WiFi task and should not contain any lengthy operations.
+ * https://docs.espressif.com/projects/esp-idf/en/latest/esp32/api-reference/network/esp_now.html#_CPPv417esp_now_recv_cb_t
+ *
+ * @param MAC The MAC of the peer from which the data came
+ * @param packet A pointer to where the incoming packet is now stored in memory
+ * @param len The length of the incoming packet
+ */
 void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
   MESH.lmfap = millis(); //any peer
-  if (memcmp(MAC, MESH.broker, 6) == 0) {
-    MESH.lastMessageFromBroker = millis(); //directly from the broker
+  if (memcmp(MAC, MESH.broker, 6) == 0) {  // directly from the broker
+    MESH.lastMessageFromBroker = millis(); // update the last time heard from the broker
   }
   mesh_packet_t *_recvPacket = (mesh_packet_t*)packet;
+  // for packets that we're going to process no matter who they are directed at
   switch (_recvPacket->type) {
-    case PACKET_TYPE_TIME:
+    case PACKET_TYPE_TIME:  // if it's a time packet, sync the RTC
       Rtc.utc_time = _recvPacket->senderTime;
       Rtc.user_time_entry = true;
-      MESH.lastMessageFromBroker = millis();
+      MESH.lastMessageFromBroker = millis();  // time packets come from the broker
       if (MESH.flags.nodeGotTime == 0) {
         RtcSync("Mesh");
         TasmotaGlobal.rules_flag.system_boot  = 1; // for now we consider the node booted and let trigger system#boot on RULES
@@ -125,25 +170,28 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
       //Wifi.retry = 0;
       // Response_P(PSTR("{\"%s\":{\"Time\":1}}"), D_CMND_MESH); //got the time, now we can publish some sensor data
       // XdrvRulesProcess();
+      AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Got time packet ..."));
       break;
     case PACKET_TYPE_PEERLIST:
-      MESH.packetToConsume.push(*_recvPacket);
+      MESH.packetToConsume.push(*_recvPacket);  // Queue the peer list to process
       return;
       break;
     default:
       // nothing for now;
       break;
   }
+  // now process packets with deference to who they're intended for
+  //if this is a packet intended for some other node
   if (memcmp(_recvPacket->receiver, MESH.sendPacket.sender, 6) != 0) { //MESH.sendPacket.sender simply stores the MAC of the node
     if (ROLE_NODE_SMALL == MESH.role) {
       return; // a 'small node' does not perform mesh functions
     }
     AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet to resend ..."));
-    MESH.packetToResend.push(*_recvPacket);
+    MESH.packetToResend.push(*_recvPacket);  // queue it for re-sending
     return;
-  } else {
-    if (_recvPacket->type == PACKET_TYPE_WANTTOPIC) {
-      MESH.flags.brokerNeedsTopic = 1;
+  } else { // if it IS intended for us
+    if (_recvPacket->type == PACKET_TYPE_WANTTOPIC) {  // if it's the broker asking for our topic
+      MESH.flags.brokerNeedsTopic = 1;  // set a flag for action
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Broker needs topic ..."));
       return; //nothing left to be done
     }
@@ -155,7 +203,7 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
     // }
     // MESH.packetsAlreadyReceived.push_back((mesh_packet_header_t*) _recvPacket);
     // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet to consume ..."));
-    MESH.packetToConsume.push(*_recvPacket);
+    MESH.packetToConsume.push(*_recvPacket);  // if we get here, queue the packet for action
   }
 }
 
@@ -169,8 +217,8 @@ void MESHInit(void) {
   MESH.interval = MESH_REFRESH;
   MESH.role = ROLE_NONE;
   MESH.packetsAlreadyReceived.reserve(5);
-  MESH.peers.reserve(10);
-  MESH.multiPackets.reserve(2);
+  MESH.peers.reserve(20);
+  MESH.multiPackets.reserve(MESH_BUFFERS);
 
   MESH.sendPacket.counter = 0;
   MESH.sendPacket.chunks = 1;
@@ -198,9 +246,9 @@ void MESHdeInit(void) {
 #ifdef ESP32
 
 /**
- * @brief Subscribes as a proxy
+ * @brief **ESP32** Subscribes to a node's topic as a proxy
  *
- * @param topic - received from the referring node
+ * @param topic - the topic received from the referring node
  */
 void MESHsubscribe(char *topic) {
   char stopic[TOPSZ];
@@ -208,12 +256,20 @@ void MESHsubscribe(char *topic) {
   MqttSubscribe(stopic);
 }
 
+/**
+ * @brief **ESP32** Unsubscribes from the node's topic
+ *
+ * @param topic - the topic to remove
+ */
 void MESHunsubscribe(char *topic) {
   char stopic[TOPSZ];
   GetTopic_P(stopic, CMND, topic, PSTR("#"));
   MqttUnsubscribe(stopic);
 }
 
+/**
+ * @brief **ESP32**  Resubscribe to *ALL* connected nodes' topics
+ */
 void MESHconnectMQTT(void){
   for (auto &_peer : MESH.peers) {
     AddLog(LOG_LEVEL_INFO, PSTR("MSH: Reconnect topic %s"), _peer.topic);
@@ -224,7 +280,7 @@ void MESHconnectMQTT(void){
 }
 
 /**
- * @brief Intercepts mqtt message, that the broker (ESP32) subscribes to as a proxy for a node.
+ * @brief **ESP32 only**  Intercepts mqtt message, that the broker (ESP32) subscribes to as a proxy for a node.
  *        Is called from xdrv_02_mqtt.ino. Will send the message in the payload via ESP-NOW.
  *
  * @param _topic
@@ -238,7 +294,7 @@ bool MESHinterceptMQTTonBroker(char* _topic, uint8_t* _data, unsigned int data_l
 
   char stopic[TOPSZ];
 //  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Intercept topic %s"), _topic);
-  for (auto &_peer : MESH.peers) {
+  for (auto &_peer : MESH.peers) {  // find the node matching the topic
     GetTopic_P(stopic, CMND, _peer.topic, PSTR("")); //cmnd/topic/
     if (strlen(_topic) != strlen(_topic)) {
       return false; // prevent false result when _topic is the leading substring of stopic
@@ -246,11 +302,13 @@ bool MESHinterceptMQTTonBroker(char* _topic, uint8_t* _data, unsigned int data_l
     if (memcmp(_topic, stopic, strlen(stopic)) == 0) {
       MESH.sendPacket.chunkSize = strlen(_topic) +1;
 
+      // if the message is too long, just bail
       if (MESH.sendPacket.chunkSize + data_len > MESH_PAYLOAD_SIZE) {
         AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Intercept payload oversized %d"), data_len);
         return false;
       }
 
+      // prepare and a packet directed to the node with the right topic and broadcast it over the mesh
       memcpy(MESH.sendPacket.receiver, _peer.MAC, 6);
       memcpy(MESH.sendPacket.payload, _topic, MESH.sendPacket.chunkSize);
       memcpy(MESH.sendPacket.payload + MESH.sendPacket.chunkSize, _data, data_len);
@@ -259,7 +317,7 @@ bool MESHinterceptMQTTonBroker(char* _topic, uint8_t* _data, unsigned int data_l
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Intercept payload '%s'"), MESH.sendPacket.payload);
       MESH.sendPacket.type = PACKET_TYPE_MQTT;
       MESH.sendPacket.senderTime = Rtc.utc_time;
-      MESHsendPacket(&MESH.sendPacket);
+      MESHsendPacket(&MESH.sendPacket); // encrypts and sends
       // int result = esp_now_send(MESH.sendPacket.receiver, (uint8_t *)&MESH.sendPacket, (sizeof(MESH.sendPacket))-(MESH_PAYLOAD_SIZE-MESH.sendPacket.chunkSize));
       //send to Node
       return true;
@@ -270,6 +328,11 @@ bool MESHinterceptMQTTonBroker(char* _topic, uint8_t* _data, unsigned int data_l
 
 #else  // ESP8266
 
+/**
+ * @brief **EP8266** Treat a packet received over the mesh as if it was received over MQTT, processing and handling
+ *
+ * @param _packet
+ */
 void MESHreceiveMQTT(mesh_packet_t *_packet);
 void MESHreceiveMQTT(mesh_packet_t *_packet){
   uint32_t _slength = strlen((char*)_packet->payload);
@@ -283,16 +346,24 @@ void MESHreceiveMQTT(mesh_packet_t *_packet){
 
 #endif  // ESP32
 
+/**
+ * @brief Checks the role of a peer on the mesh
+ *
+ * @return *true*  If acting as a node
+ * @return *false*  If acting as broker
+ */
 bool MESHroleNode(void) {
   return (MESH.role > ROLE_BROKER);
 }
 
 /**
- * @brief Redirects the outgoing mqtt message on the node just before it would have been sent to
- *        the broker via ESP-NOW
+ * @brief Redirects an outgoing mqtt message on a node to the ESP-NOW mesh just before
+ * it otherwise would have been sent to the MQTT broker.
  *
- * @param _topic
- * @param _data
+ * This breaks the outgoing data into multiple ESP-NOW packets as necessary.
+ *
+ * @param _topic The outgoing MQTT topic
+ * @param _data The outgoing MQTT message
  * @param _retained - currently unused
  * @return true
  * @return false
@@ -355,18 +426,21 @@ bool MESHrouteMQTTtoMESH(const char* _topic, char* _data, bool _retained) {
 }
 
 /**
- * @brief The node sends its mqtt topic to the broker
+ * @brief The node registers or refreshes its status with the ESP-NOW broker by sending a message
+ * with the MAC of the desired broker and its own mqtt topic
+ *
+ * @param mode 0 for a new node registration, 1 for a refresh
  *
  */
 void MESHregisterNode(uint8_t mode){
-  memcpy(MESH.sendPacket.receiver, MESH.broker, 6);  // First 6 bytes -> MAC of broker
-  strcpy((char*)MESH.sendPacket.payload +6, TasmotaGlobal.mqtt_topic);  // Remaining bytes -> topic of node
+  memcpy(MESH.sendPacket.receiver, MESH.broker, 6);  // Set desired receiver as MAC of broker
   AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Register node with topic '%s'"), (char*)MESH.sendPacket.payload +6);
   MESH.sendPacket.TTL = 2;
   MESH.sendPacket.chunks = 1;
   MESH.sendPacket.chunk = 0;
   MESH.sendPacket.chunkSize = strlen(TasmotaGlobal.mqtt_topic) + 1 + 6;
-  memcpy(MESH.sendPacket.payload, MESH.broker, 6);
+  memcpy(MESH.sendPacket.payload, MESH.broker, 6);  // First 6 bytes -> MAC of broker
+  strcpy((char*)MESH.sendPacket.payload +6, TasmotaGlobal.mqtt_topic);  // Remaining bytes -> topic of node
   MESH.sendPacket.type = (mode == 0) ? PACKET_TYPE_REGISTER_NODE : PACKET_TYPE_REFRESH_NODE;
   MESHsendPacket(&MESH.sendPacket);
 }
@@ -375,6 +449,12 @@ void MESHregisterNode(uint8_t mode){
  * Generic functions
 \*********************************************************************************************/
 
+/**
+ * @brief Initializes the ESP-NOW netowrk on an ESP8266 as a new node.  No action taken for an ESP32 at this time.
+ *
+ * @param _channel The wifi channel for the mesh
+ * @param _role The node's role, @see MESH_Role
+ */
 void MESHstartNode(int32_t _channel, uint8_t _role){ //we need a running broker with a known channel at that moment
 #ifdef ESP8266 // for now only ESP8266, might be added for the ESP32 later
   MESH.channel = _channel;
@@ -383,7 +463,7 @@ void MESHstartNode(int32_t _channel, uint8_t _role){ //we need a running broker 
   wifi_promiscuous_enable(1);
   wifi_set_channel(MESH.channel);
   wifi_promiscuous_enable(0);
-  WiFi.disconnect();
+  WiFi.disconnect();  // disconnect from the wifi router, in preference of the mesh
   MESHsetWifi(0);
   esp_now_deinit();  // in case it was already initialized but disconnected
   int init_result = esp_now_init();
@@ -416,6 +496,10 @@ void MESHstartNode(int32_t _channel, uint8_t _role){ //we need a running broker 
 #endif  // ESP8266
 }
 
+/**
+ * @brief Initializes the ESP-NOW network on an ESP32 as a mesh broker.
+ * No action taken at this time for an ESP8266.
+ */
 void MESHstartBroker(void) {       // Must be called after WiFi is initialized!! Rule - on system#boot do meshbroker endon
 #ifdef ESP32
   WiFi.mode(WIFI_AP_STA);
@@ -449,11 +533,15 @@ void MESHstartBroker(void) {       // Must be called after WiFi is initialized!!
 
 #ifdef ESP32
 
+/**
+ * @brief This is used for lower-priority prosessing of mesh action queues.
+ * On each iteration, handle the packet in the front of the packetToConsume vector.
+ */
 void MESHevery50MSecond(void) {
   // if (MESH.packetToResend.size() > 0) {
   //   // pass the packets
   // }
-  if (MESH.packetToConsume.size() > 0) {
+  if (MESH.packetToConsume.size() > 0) {  // action only needed if we have packets in queue
 //    AddLog(LOG_LEVEL_DEBUG, PSTR("_"));
 //    AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)&MESH.packetToConsume.front(), 15);
     for (auto &_headerBytes : MESH.packetsAlreadyReceived) {
@@ -461,25 +549,28 @@ void MESHevery50MSecond(void) {
 //      AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_headerBytes.raw, 15);
       if (memcmp(MESH.packetToConsume.front().sender, _headerBytes.raw, 15) == 0) {
         MESH.packetToConsume.pop();
+        // ^^ if the message has already been received, remove it from the queue and move on
         return;
       }
     }
     mesh_first_header_bytes _bytes;
     memcpy(_bytes.raw, &MESH.packetToConsume.front(), 15);
     MESH.packetsAlreadyReceived.push_back(_bytes);
-//    AddLog(LOG_LEVEL_DEBUG, PSTR("..."));
-//    AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_bytes.raw, 15);
+    // ^^ immediately put the packet being consumed on the list of already consumed packets
+    // AddLog(LOG_LEVEL_DEBUG, PSTR("..."));
+    // AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_bytes.raw, 15);
     if (MESH.packetsAlreadyReceived.size() > MESH_MAX_PACKETS) {
       MESH.packetsAlreadyReceived.erase(MESH.packetsAlreadyReceived.begin());
-//      AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Erase received data"));
+      // ^^ if the queue of already received packets is full, delete the first one in the queue
+      // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Erase received data"));
     }
 
     // do something on the node
     // AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)&MESH.packetToConsume.front(), 30);
 
-    MESHencryptPayload(&MESH.packetToConsume.front(), 0);
+    MESHencryptPayload(&MESH.packetToConsume.front(), 0);  // decrypt the payload of the packet to consume
     switch (MESH.packetToConsume.front().type) {
-      // case PACKET_TYPE_REGISTER_NODE:
+      // case PACKET_TYPE_REGISTER_NODE: // NOTE:  This is handled directly in the receive call-back
       //   AddLog(LOG_LEVEL_INFO, PSTR("MSH: received topic: %s"), (char*)MESH.packetToConsume.front().payload + 6);
       //   // AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize+5);
       //   for(auto &_peer : MESH.peers){
@@ -489,7 +580,7 @@ void MESHevery50MSecond(void) {
       //     }
       //   }
       //   break;
-      case PACKET_TYPE_PEERLIST:
+      case PACKET_TYPE_PEERLIST:  // add all peers on a peer list to own peer list
         for (uint32_t i = 0; i < MESH.packetToConsume.front().chunkSize; i += 6) {
           if (memcmp(MESH.packetToConsume.front().payload +i, MESH.sendPacket.sender, 6) == 0) {
             continue;              // Do not add myself
@@ -500,90 +591,109 @@ void MESHevery50MSecond(void) {
         }
         break;
       case  PACKET_TYPE_MQTT:      // Redirected MQTT from node in packet [char* _space_ char*]
+        // bump up the time of the last message from this peer
+        uint32_t idx = 0;
+        for (auto &_peer : MESH.peers){
+          if (memcmp(_peer.MAC, MESH.packetToConsume.front().sender, 6) == 0) {
+            _peer.lastMessageFromPeer = millis();
+            // MESH.lastTeleMsgs[idx] = std::string(_data);  // store the message for display
+            break;
+          }
+          idx++;
+        }
 //        AddLog(LOG_LEVEL_INFO, PSTR("MSH: Received node output '%s'"), (char*)MESH.packetToConsume.front().payload);
-        if (MESH.packetToConsume.front().chunks > 1) {
+        if (MESH.packetToConsume.front().chunks > 1) {  // if we need to reassemble multiple packets into a single MQTT message
           bool _foundMultiPacket = false;
-          for (auto &_packet_combined : MESH.multiPackets) {
-//            AddLog(LOG_LEVEL_INFO, PSTR("MSH: Append to multipacket"));
-            if (memcmp(_packet_combined.header.sender, MESH.packetToConsume.front().sender, 12) == 0) {
-              if (_packet_combined.header.counter == MESH.packetToConsume.front().counter) {
-                memcpy(_packet_combined.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
-                bitSet(_packet_combined.receivedChunks, MESH.packetToConsume.front().chunk);
+          for (auto &_packet_combined = MESH.multiPackets.begin(); &_packet_combined != MESH.multiPackets.end(); )// iterate through the vector of partially reassembled multi-packet  chunks
+            //  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Append to multipacket"));
+            if (memcmp(_packet_combined.header.sender, MESH.packetToConsume.front().sender, 12) == 0) {  // if the headers match
+              if (_packet_combined.header.counter == MESH.packetToConsume.front().counter) {  // and the message counter mathes
                 _foundMultiPacket = true;
-//                AddLog(LOG_LEVEL_INFO, PSTR("MSH: Multipacket rcvd chunk mask 0x%08X"), _packet_combined.receivedChunks);
+                memcpy(_packet_combined.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
+                // ^^ copy the payload
+                bitSet(_packet_combined.receivedChunks, MESH.packetToConsume.front().chunk);
+                // ^^ set the appropriate bit for the received chunk number
+                // AddLog(LOG_LEVEL_INFO, PSTR("MSH: Multipacket rcvd chunk mask 0x%08X"), _packet_combined.receivedChunks);
+                uint32_t _temp = (1 << (uint8_t)MESH.packetToConsume.front().chunks) -1; //example: 1+2+4 == (2^3)-1
+                //^^ this is a filled bit-mask denoting all possible chunks received of the message for which the packet to consume is a chunk of
+                // AddLog(LOG_LEVEL_INFO, PSTR("MSH: _temp: %u = %u"),_temp,_packet_combined.receivedChunks);
+                if (_packet_combined.receivedChunks == _temp) {  // if this multi-packet in the multi-packet reassembly buffer is now full
+                  char * _data = (char*)_packet_combined.raw + strlen((char*)_packet_combined.raw) + 1;
+                  // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish multipacket"));
+                  MqttPublishPayload((char*)_packet_combined.raw, _data); // publish it
+                  _packet_combined=MESH.multiPackets.erase(_packet_combined);  // release the storage space
+                  break;
+                }
               }
             }
-            uint32_t _temp = (1 << (uint8_t)MESH.packetToConsume.front().chunks) -1; //example: 1+2+4 == (2^3)-1
-//            AddLog(LOG_LEVEL_INFO, PSTR("MSH: _temp: %u = %u"),_temp,_packet_combined.receivedChunks);
-            if (_packet_combined.receivedChunks == _temp) {
-              char * _data = (char*)_packet_combined.raw + strlen((char*)_packet_combined.raw) + 1;
-//              AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish multipacket"));
-              MqttPublishPayload((char*)_packet_combined.raw, _data);
-              MESH.multiPackets.erase(MESH.multiPackets.begin());
-              break;
-            }
+            ++_packet_combined;// move to the next reassembly vector
           }
-          if (!_foundMultiPacket) {
-            mesh_packet_combined_t _packet;
+          if (!_foundMultiPacket) { // if we didn't find any matching packets in the multi-packet re-assembly storage
+            mesh_packet_combined_t _packet;  // create a new re-assembly packet
             memcpy(_packet.header.sender, MESH.packetToConsume.front().sender, sizeof(_packet.header));
             memcpy(_packet.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
             _packet.receivedChunks = 0;
             bitSet(_packet.receivedChunks, MESH.packetToConsume.front().chunk);
-            MESH.multiPackets.push_back(_packet);
+            MESH.multiPackets.push_back(_packet);  // and push it into the storage vector
 //            AddLog(LOG_LEVEL_INFO, PSTR("MSH: New multipacket with chunks %u"), _packet.header.chunks);
           }
-        } else {
+        } else {  // if this is not a multi-packet message, directly deal with it
 //          AddLog(LOG_LEVEL_INFO, PSTR("MSH: chunk: %u size: %u"), MESH.packetToConsume.front().chunk, MESH.packetToConsume.front().chunkSize);
 //          if (MESH.packetToConsume.front().chunk==0) AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize);
           char * _data = (char*)MESH.packetToConsume.front().payload + strlen((char*)MESH.packetToConsume.front().payload) +1;
 //          AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish packet"));
           MqttPublishPayload((char*)MESH.packetToConsume.front().payload, _data);
-
-          uint32_t idx = 0;
-          for (auto &_peer : MESH.peers){
-            if (memcmp(_peer.MAC, MESH.packetToConsume.front().sender, 6) == 0) {
-              _peer.lastMessageFromPeer = millis();
-              MESH.lastTeleMsgs[idx] = std::string(_data);
-              break;
-            }
-            idx++;
-          }
 //          AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize);
         }
         break;
-      default:
+      default:  // NOTE:  time, register, and refresh packet types are handled in the high-priority call back
         AddLogBuffer(LOG_LEVEL_DEBUG, (uint8_t *)&MESH.packetToConsume.front(), MESH.packetToConsume.front().chunkSize +5);
       break;
     }
-    MESH.packetToConsume.pop();
+    MESH.packetToConsume.pop();  // remove the now consumed packet from the queue
 //    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Consumed one packet %u"), (char*)MESH.packetToConsume.size());
   }
 }
 
+
+/**
+ * @brief Used to check status and keep everyone in line.
+ */
 void MESHEverySecond(void) {
-  static uint32_t _second = 0;
+  static uint32_t _second = 0;  // NOTE: static, not reinitialized every time fxn is run
   _second++;
   // send a time packet every x seconds
   if (MESH.flags.nodeWantsTimeASAP) {
+    AddLog(LOG_LEVEL_INFO, PSTR("MSH: Node wants time from broker ASAP"));
     MESHsendTime();
     MESH.flags.nodeWantsTimeASAP = 0;
     return;
   }
   if (_second % 5 == 0) {
     if ((MESH.flags.nodeWantsTime == 1) || (_second % 30 == 0)) { //every 5 seconds on demand or every 30 seconds anyway
+      AddLog(LOG_LEVEL_INFO, PSTR("MSH: Node wants time from broker or 30s since last time packet"));
       MESHsendTime();
       MESH.flags.nodeWantsTime = 0;
       return;
     }
   }
-  uint32_t _peerNumber = _second%45;
+  uint32_t _peerNumber = _second%45; // get topic from peer every 45 seconds
   if (_peerNumber < MESH.peers.size()) {
-    if (MESH.peers[_peerNumber].topic[0] == 0) {
+    // if (MESH.peers[_peerNumber].topic[0] == 0) {
       AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker wants topic from peer %u"), _peerNumber);
       MESHdemandTopic(_peerNumber);
+    // }
+  }
+  for (auto &_peer = MESH.peers.begin(); &_peer = MESH.peers.end(); ) {  // check on peers
+    if (millis() - _peer.lastMessageFromPeer > 70000) {  // if it's been more than 70s since we heard from the peer
+      MESHunsubscribe((char*)&_peer.topic);  // Un-subscribe to the peer's topic
+      _peer=MESH.peers.erase(_peer);  // erase the peer from the list
+    } else {
+       ++_peer;
     }
   }
-  if (MESH.multiPackets.size() > 3) {
+  if (MESH.multiPackets.size() > MESH_BUFFERS) {
+    // clean out memory space, if needed
     AddLog(LOG_LEVEL_INFO, PSTR("MSH: Multi packets in buffer %u"), MESH.multiPackets.size());
     MESH.multiPackets.erase(MESH.multiPackets.begin());
   }

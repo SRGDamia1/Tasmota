@@ -36,9 +36,12 @@
 #define D_CMND_MESH "MESH"
 
 #define MESH_PAYLOAD_SIZE 160      // Default 160 - with header of 20 bytes and 16 bytes tag, stays below 200 bytes, which is reported to work with ESP8266
+// Espressif stated max payload is 250 bytes
 #define MESH_TOPICSZ      64       // Max supported topic size
-#define MESH_BUFFERS      26       // (6) Max buffers number for splitted messages
-#define MESH_MAX_PACKETS  5        // (3) Max number of packets
+#define MESH_BUFFERS      20       // (20) Number buffers for reassembling split messages (on broker only!)
+#define MESH_MAX_PACKETS  5        // (5) Max number of packets over which a message can be split,
+// absolute maximum **OUTGOING** message length of node = (MESH_PAYLOAD_SIZE - lenth_of_node_topic) * MESH_MAX_PACKETS
+// maximum **INCOMING** message length of node = MESH_PAYLOAD_SIZE - lenth_of_node_topic -> No incoming buffer on node!
 #define MESH_REFRESH      50       // Number of ms
 
 // The format of the vendor-specific action frame is as follows:
@@ -104,7 +107,9 @@ struct mesh_flags_t {
 struct mesh_packet_combined_t {
   mesh_packet_header_t header;
   uint32_t receivedChunks;         // Bitmask for up to 32 chunks
-  char raw[MESH_PAYLOAD_SIZE * MESH_BUFFERS];
+  char raw[MESH_PAYLOAD_SIZE * MESH_MAX_PACKETS];
+  // size of each is the size of an individual payload multiplied by the
+  // maximum number of packets over which we're willing to split a message
 };
 
 struct mesh_first_header_bytes {   // TODO: evaluate random 4-byte-value of pre-packet
@@ -113,24 +118,24 @@ struct mesh_first_header_bytes {   // TODO: evaluate random 4-byte-value of pre-
 
 struct {
   uint32_t lastMessageFromBroker;  // Time of last message from broker
-  uint32_t lmfap;                  // Yime of last message from any peer
-  uint8_t broker[6] = { 0 };
-  uint8_t key[32];
-  uint8_t role;
+  uint32_t lmfap;                  // Time of last message from any peer
+  uint8_t broker[6] = { 0 };       // The MAC of the broker
+  uint8_t key[32];                 // The encryption/decryption key (taken from the PASSWORD1)
+  uint8_t role;                    // The role of the node, from enum MESH_Role
   uint8_t channel;                 // Wifi channel
-  uint8_t interval;
-  uint8_t currentTopicSize;
-  mesh_flags_t flags;
-  mesh_packet_t sendPacket;
-  std::vector<mesh_peer_t> peers;
-  std::queue<mesh_packet_t> packetToResend;
-  std::queue<mesh_packet_t> packetToConsume;
-  std::vector<mesh_packet_header_t> packetsAlreadySended;
-  std::vector<mesh_first_header_bytes> packetsAlreadyReceived;
-  std::vector<mesh_packet_combined_t> multiPackets;
-#ifdef ESP32
-  std::vector<std::string> lastTeleMsgs;
-#endif //ESP32
+  uint8_t interval;                // Interval between processing loops
+  uint8_t currentTopicSize;        // Length of current MQTT topic
+  mesh_flags_t flags;              // Flags for needed mesh actions
+  mesh_packet_t sendPacket;        // Holder for the next outgoing mesh packet
+  std::vector<mesh_peer_t> peers;  // List of all mesh peers
+  std::queue<mesh_packet_t> packetToResend;  // Queue for the packets to resend
+  std::queue<mesh_packet_t> packetToConsume;  // Queue for the packets to process
+  std::vector<mesh_packet_header_t> packetsAlreadySended;  // A reference to ensure packets aren't double-sent
+  std::vector<mesh_first_header_bytes> packetsAlreadyReceived;  // A reference to ensure packets aren't double-processed
+  std::vector<mesh_packet_combined_t> multiPackets;  // Storage for partially assembled split packets
+// #ifdef ESP32
+//   std::vector<std::string> lastTeleMsgs;  // for web display of message history
+// #endif //ESP32
 } MESH;
 
 /*********************************************************************************************\
@@ -173,6 +178,9 @@ enum MESH_Packet_Type {            // Type of packet
 
 #ifdef ESP32
 
+/**
+ * @brief **ESP-32 ONLY**  Prepares a "sendPacket" object for a time packet and then broadcasts it over the mesh.
+ */
 void MESHsendTime(void) {          // Only from broker to nodes
   MESH.sendPacket.counter++;
   MESH.sendPacket.type = PACKET_TYPE_TIME;
@@ -190,6 +198,13 @@ void MESHsendTime(void) {          // Only from broker to nodes
   MESHsendPacket(&MESH.sendPacket);
 }
 
+/**
+ * @brief **ESP-32 ONLY**  Prepares a "sendPacket" object for a demand for the MQTT topic of a peer (node) and broadcast it over the mesh.
+ *
+ * The packet type is `PACKET_TYPE_WANTTOPIC` and the payload is empty.  No time is sent in this packet?
+ *
+ * @param _peerNumber  The peer number (within the stored peer list) to demand the topic from.
+ */
 void MESHdemandTopic(uint32_t _peerNumber) {
   MESH.sendPacket.counter++;
   MESH.sendPacket.type = PACKET_TYPE_WANTTOPIC;
@@ -203,6 +218,11 @@ void MESHdemandTopic(uint32_t _peerNumber) {
 
 #endif //ESP32
 
+/**
+ * @brief Prepares a sendPacket object with a list of all know peers
+ *
+ * The packet type is `PACKET_TYPE_PEERLIST` and the payload is a list of the MAC's of all peers.
+ */
 void MESHsendPeerList(void) {      // We send this list only to the peers, that can directly receive it
   MESH.sendPacket.counter++;
   MESH.sendPacket.type = PACKET_TYPE_PEERLIST;
@@ -222,6 +242,13 @@ void MESHsendPeerList(void) {      // We send this list only to the peers, that 
   MESHsendPacket(&MESH.sendPacket);
 }
 
+/**
+ * @brief Iterate over the peer list checking for the given MAC
+ *
+ * @param MAC The MAC address of a potentially known peer
+ * @return *true*  If the peer is already on the peer list
+ * @return *false*  If the peer is *NOT* on the peer list
+ */
 bool MESHcheckPeerList(const uint8_t *MAC) {
   bool success = false;
   for (auto &_peer : MESH.peers) {
@@ -233,6 +260,11 @@ bool MESHcheckPeerList(const uint8_t *MAC) {
   return false;
 }
 
+/**
+ * @brief Count the number of peers on the know peer list
+ *
+ * @return *uint8_t*  The number of peers
+ */
 uint8_t MESHcountPeers(void) {
 #ifdef ESP32
   esp_now_peer_num_t _peernum;
@@ -247,6 +279,12 @@ uint8_t MESHcountPeers(void) {
   return _num;
 }
 
+/**
+ * @brief Adds a new peer to the list of known peers
+ *
+ * @param _MAC The MAC address of the new peer
+ * @return *int* 0 if the peer is successfully added, else the esp_now error number
+ */
 int MESHaddPeer(uint8_t *_MAC ) {
   mesh_peer_t _newPeer;
   memcpy(_newPeer.MAC, _MAC, 6);
@@ -255,10 +293,10 @@ int MESHaddPeer(uint8_t *_MAC ) {
   _newPeer.topic[0] = 0;
 #endif
   MESH.peers.push_back(_newPeer);
-#ifdef ESP32
-  std::string _msg = "{\"Init\":1}"; // Init with a simple JSON only while developing
-  MESH.lastTeleMsgs.push_back(_msg); // We must keep this vector in sync with the peers-struct on the broker regarding the indices
-#endif //ESP32
+// #ifdef ESP32
+//   std::string _msg = "{\"Init\":1}"; // Init with a simple JSON only while developing
+//   MESH.lastTeleMsgs.push_back(_msg); // We must keep this vector in sync with the peers-struct on the broker regarding the indices
+// #endif //ESP32
   int err;
 #ifdef ESP32
   esp_now_peer_info_t _peer;
@@ -287,6 +325,13 @@ int MESHaddPeer(uint8_t *_MAC ) {
 }
 
 //helper functions
+/**
+ * @brief Removes colons from the string pointed to by the input pointer.
+ *
+ * Used to read MAC addresses
+ *
+ * @param _string The a pointer to the string potentially with colons.
+ */
 void MESHstripColon(char* _string) {
   uint32_t _length = strlen(_string);
   uint32_t _index = 0;
@@ -300,6 +345,12 @@ void MESHstripColon(char* _string) {
   _string[_index] = 0;
 }
 
+/**
+ * @brief Converts a character string pointer for a MAC address into an array of bytes
+ *
+ * @param _string A pointer to the string MAC address
+ * @param _MAC An array of bytes for the MAC address
+ */
 void MESHHexStringToBytes(char* _string, uint8_t _MAC[]) { //uppercase
   MESHstripColon(_string);
   UpperCase(_string, _string);
@@ -320,12 +371,31 @@ void MESHHexStringToBytes(char* _string, uint8_t _MAC[]) { //uppercase
   }
 }
 
+/**
+ * @brief Encrypts one packet from a message and broadcasts it over the ESP-NOW network
+ *
+ * @param _packet
+ */
 void MESHsendPacket(mesh_packet_t *_packet) {
   MESHencryptPayload(_packet, 1);
 //  esp_now_send(_packet->receiver, (uint8_t *)_packet, sizeof(MESH.sendPacket) - MESH_PAYLOAD_SIZE + _packet->chunkSize);
-  esp_now_send(NULL, (uint8_t *)_packet, sizeof(MESH.sendPacket) - MESH_PAYLOAD_SIZE + _packet->chunkSize); //NULL -> broadcast
+  esp_now_send(NULL, (uint8_t *)_packet, sizeof(MESH.sendPacket) - MESH_PAYLOAD_SIZE + _packet->chunkSize); // NULL peer address -> broadcast
+  //  ^^ Return
+  //        ESP_OK : succeed
+  //        ESP_ERR_ESPNOW_NOT_INIT : ESPNOW is not initialized
+  //        ESP_ERR_ESPNOW_ARG : invalid argument
+  //        ESP_ERR_ESPNOW_INTERNAL : internal error
+  //        ESP_ERR_ESPNOW_NO_MEM : out of memory
+  //        ESP_ERR_ESPNOW_NOT_FOUND : peer is not found
+  //        ESP_ERR_ESPNOW_IF : current WiFi interface doesn’t match that of peer
+
 }
 
+/**
+ * @brief Sets the current wifi password as the encryption key for ESP-NOW
+ *
+ * @param _key A pointer to the place in memory to store the new encryption key
+ */
 void MESHsetKey(uint8_t* _key) {   // Must be 32 bytes!!!
   char* _pw = SettingsText(SET_STAPWD1 + Settings->sta_active);
   size_t _length = strlen(_pw);
@@ -335,6 +405,14 @@ void MESHsetKey(uint8_t* _key) {   // Must be 32 bytes!!!
   AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: set crypto key to PASSWORD1"));
 }
 
+/**
+ * @brief Encrypts or decrypts a mesh package using the encryption key (the wifi password)
+ *
+ * @param _packet The packet to encrypt
+ * @param _encrypt 1 to encrypt, 0 to decrypt
+ * @return *true* encryption succeeded
+ * @return *false* encryption failed
+ */
 bool MESHencryptPayload(mesh_packet_t *_packet, int _encrypt) {
 
 // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: will encrypt: %u"), _encrypt);
@@ -366,6 +444,9 @@ bool MESHencryptPayload(mesh_packet_t *_packet, int _encrypt) {
   return false;
 }
 
+/**
+ * @brief Sets the sleep interval to that of the mesh interval.
+ */
 void MESHsetSleep(void) {
   if (MESH.role && (Settings->sleep > MESH.interval)) {
     Settings->sleep = MESH.interval;
@@ -373,6 +454,11 @@ void MESHsetSleep(void) {
   }
 }
 
+/**
+ * @brief Enables or disables the standard wifi interface
+ *
+ * @param state True to enable wifi, False to disable it
+ */
 void MESHsetWifi(bool state) {
 #ifdef ESP8266                         // Only ESP8266 as ESP32 is a broker and needs Wifi
   if (state) {                         // Wifi On
@@ -387,6 +473,11 @@ void MESHsetWifi(bool state) {
 #endif  // ESP8266
 }
 
+/**
+ * @brief Calculates the maximum size of of MQTT payload within a MESH packet, given the space already taken by the topic
+ *
+ * @return *uint32_t*  The remaining space in the payload
+ */
 uint32_t MESHmaxPayloadSize(void) {
   return MESH_PAYLOAD_SIZE - MESH.currentTopicSize -1;
 }

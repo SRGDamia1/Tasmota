@@ -3,7 +3,9 @@
 This driver provides the ability to move TASMOTA-devices out of the WLAN by using ESP-NOW to communicate bidirectional with an internal protocol.
 
 Thus the workload for the WLAN-router is reduced and with the reduced overhead the local 2.4-GHz-band will be freed of some traffic. Power consumption of the nodes will be reduced significantly allowing better battery powered projects with TASMOTA.
-Automatic payload encryption is applied using the WiFi-password1 as the key. A maximum of 32 bytes of this password is used for the ChaCha20Poly1305 authenticated encryption as the key.
+Automatic payload encryption is applied using the WiFi-password1 as the key.
+A maximum of 32 bytes of this password is used for the ChaCha20Poly1305 authenticated encryption as the key.
+(NOTE:  BearSSL is used for encryption.  For purposes of maximum supported peers on ESP-NOW, all peers are un-encrypted.)
 
 As ACK/NACK messages seem to be not reliable on both ESP-platforms, the method "send-and-pray" is used.
 
