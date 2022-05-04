@@ -217,8 +217,8 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
 void MESHInit(void) {
   MESH.interval = MESH_REFRESH;
   MESH.role = ROLE_NONE;
-  MESH.packetsAlreadyReceived.reserve(5);
-  MESH.peers.reserve(20);
+  // MESH.packetsAlreadyReceived.reserve(5);
+  MESH.peers.reserve(5);
 #ifdef ESP32
   MESH.multiPackets.reserve(MESH_BUFFERS);
 #endif
@@ -547,28 +547,28 @@ void MESHevery50MSecond(void) {
   //   // pass the packets
   // }
   if (MESH.packetToConsume.size() > 0) {  // action only needed if we have packets in queue
-//    AddLog(LOG_LEVEL_DEBUG, PSTR("_"));
-//    AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)&MESH.packetToConsume.front(), 15);
-    for (auto &_headerBytes : MESH.packetsAlreadyReceived) {
-//      AddLog(LOG_LEVEL_DEBUG, PSTR("."));
-//      AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_headerBytes.raw, 15);
-      if (memcmp(MESH.packetToConsume.front().sender, _headerBytes.raw, 15) == 0) {
-        MESH.packetToConsume.pop();
-        // ^^ if the message has already been received, remove it from the queue and move on
-        return;
-      }
-    }
-    mesh_first_header_bytes _bytes;
-    memcpy(_bytes.raw, &MESH.packetToConsume.front(), 15);
-    MESH.packetsAlreadyReceived.push_back(_bytes);
-    // ^^ immediately put the packet being consumed on the list of already consumed packets
-    // AddLog(LOG_LEVEL_DEBUG, PSTR("..."));
-    // AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_bytes.raw, 15);
-    if (MESH.packetsAlreadyReceived.size() > MESH_MAX_PACKETS) {
-      MESH.packetsAlreadyReceived.erase(MESH.packetsAlreadyReceived.begin());
-      // ^^ if the queue of already received packets is full, delete the first one in the queue
-      // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Erase received data"));
-    }
+// //    AddLog(LOG_LEVEL_DEBUG, PSTR("_"));
+// //    AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)&MESH.packetToConsume.front(), 15);
+//     for (auto &_headerBytes : MESH.packetsAlreadyReceived) {
+// //      AddLog(LOG_LEVEL_DEBUG, PSTR("."));
+// //      AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_headerBytes.raw, 15);
+//       if (memcmp(MESH.packetToConsume.front().sender, _headerBytes.raw, 15) == 0) {
+//         MESH.packetToConsume.pop();
+//         // ^^ if the message has already been received, remove it from the queue and move on
+//         return;
+//       }
+//     }
+//     mesh_first_header_bytes _bytes;
+//     memcpy(_bytes.raw, &MESH.packetToConsume.front(), 15);
+//     MESH.packetsAlreadyReceived.push_back(_bytes);
+//     // ^^ immediately put the packet being consumed on the list of already consumed packets
+//     // AddLog(LOG_LEVEL_DEBUG, PSTR("..."));
+//     // AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)_bytes.raw, 15);
+//     if (MESH.packetsAlreadyReceived.size() > MESH_MAX_PACKETS) {
+//       MESH.packetsAlreadyReceived.erase(MESH.packetsAlreadyReceived.begin());
+//       // ^^ if the queue of already received packets is full, delete the first one in the queue
+//       // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Erase received data"));
+//     }
 
     // do something on the node
     // AddLogBuffer(LOG_LEVEL_DEBUG,(uint8_t *)&MESH.packetToConsume.front(), 30);

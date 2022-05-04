@@ -132,8 +132,8 @@ struct {
   std::vector<mesh_peer_t> peers;  // List of all mesh peers
   std::queue<mesh_packet_t> packetToResend;  // Queue for the packets to resend
   std::queue<mesh_packet_t> packetToConsume;  // Queue for the packets to process
-  std::vector<mesh_packet_header_t> packetsAlreadySended;  // A reference to ensure packets aren't double-sent
-  std::vector<mesh_first_header_bytes> packetsAlreadyReceived;  // A reference to ensure packets aren't double-processed
+  // std::vector<mesh_packet_header_t> packetsAlreadySended;  // A reference to ensure packets aren't double-sent
+  // std::vector<mesh_first_header_bytes> packetsAlreadyReceived;  // A reference to ensure packets aren't double-processed
 #ifdef ESP32
   std::vector<mesh_packet_combined_t> multiPackets;  // Storage for partially assembled split packets
 #endif
