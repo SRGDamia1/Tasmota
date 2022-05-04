@@ -183,12 +183,14 @@
 #endif
 
 // -- MQTT - Tasmota Discovery ---------------------
+#ifndef FIRMWARE_MINIMAL
 #define USE_TASMOTA_DISCOVERY // Enable Tasmota Discovery support (+2k code)
+#endif
 
 // -- Ping ----------------------------------------
-#ifndef FIRMWARE_MINIMAL
-#define USE_PING // Enable Ping command (+2k code)
-#endif
+// #ifndef FIRMWARE_MINIMAL
+// #define USE_PING // Enable Ping command (+2k code)
+// #endif
 
 // -- Rules or Script  ----------------------------
 #ifndef FIRMWARE_MINIMAL
@@ -201,9 +203,9 @@
 //  #define USER_RULE2 "<Any rule2 data>"          // Add rule2 data saved at initial firmware load or when command reset is executed
 //  #define USER_RULE3 "<Any rule3 data>"          // Add rule3 data saved at initial firmware load or when command reset is executed
 
-#define USE_WEBGETCONFIG // Enable restoring config from external webserver (+0k6)
+// #define USE_WEBGETCONFIG // Enable restoring config from external webserver (+0k6)
 
-#define USER_BACKLOG "WebGetConfig http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/configuration/config_%id%.dmp" // Add commands executed at firmware load or when command reset is executed
+// #define USER_BACKLOG "WebGetConfig http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/configuration/config_%id%.dmp" // Add commands executed at firmware load or when command reset is executed
 #endif
 
 // -- Emulation for Alexa ---------------------
