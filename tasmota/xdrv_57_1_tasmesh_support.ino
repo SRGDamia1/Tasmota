@@ -319,7 +319,7 @@ int MESHaddPeer(uint8_t *_MAC ) {
   #ifdef ESP32
     if (ROLE_BROKER == MESH.role) { MESHsendTime(); }
   #endif //ESP32
-    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Peers\":%u}}"), D_CMND_MESH, MESH.peers.size());
+    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Trigger: {\"%s\":{\"Peers\":%u}}"), D_CMND_MESH, MESH.peers.size());
     Response_P(PSTR("{\"%s\":{\"Peers\":%u}}"), D_CMND_MESH, MESH.peers.size());
     XdrvRulesProcess(0);
     return err;

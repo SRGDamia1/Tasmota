@@ -57,7 +57,7 @@ void CB_MESHDataSent(const uint8_t *MAC, esp_now_send_status_t sendStatus);
 void CB_MESHDataSent(const uint8_t *MAC, esp_now_send_status_t sendStatus) {
   char _destMAC[18];
   ToHex_P(MAC, 6, _destMAC, 18, ':');
-  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Sent to %s status %d"), _destMAC, sendStatus);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Data sent to %s with send status %d"), _destMAC, sendStatus);
 }
 
 /**
@@ -137,7 +137,7 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
 void CB_MESHDataSent(uint8_t *MAC, uint8_t sendStatus) {
   char _destMAC[18];
   ToHex_P(MAC, 6, _destMAC, 18, ':');
-  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Sent to %s status %d"), _destMAC, sendStatus);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Data sent to %s with send status %d"), _destMAC, sendStatus);
 }
 
 /**
@@ -168,7 +168,7 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
       }
       MESH.flags.nodeGotTime = 1;
       //Wifi.retry = 0;
-      AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Time\":1}}"), D_CMND_MESH);
+      AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Trigger: {\"%s\":{\"Time\":1}}"), D_CMND_MESH);
       Response_P(PSTR("{\"%s\":{\"Time\":1}}"), D_CMND_MESH); //got the time, now we can publish some sensor data
       XdrvRulesProcess(0);
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Got time packet ..."));
@@ -480,7 +480,7 @@ void MESHstartNode(int32_t _channel, uint8_t _role){ //we need a running broker 
   }
 
   AddLog(LOG_LEVEL_INFO, PSTR("MSH: Node initialized, channel: %u"),wifi_get_channel());
-  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Node\":1,\"Channel\":%u,\"Role\":%u}}"), D_CMND_MESH, wifi_get_channel(), _role);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Trigger: {\"%s\":{\"Node\":1,\"Channel\":%u,\"Role\":%u}}"), D_CMND_MESH, wifi_get_channel(), _role);
   Response_P(PSTR("{\"%s\":{\"Node\":1,\"Channel\":%u,\"Role\":%u}}"), D_CMND_MESH, wifi_get_channel(), _role);
   XdrvRulesProcess(0);
 
@@ -518,7 +518,7 @@ void MESHstartBroker(void) {       // Must be called after WiFi is initialized!!
     return;
   }
 
-  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Trigger: {\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
   Response_P(PSTR("{\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
   XdrvRulesProcess(0);
 //  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker initialized on channel %u"), _channel);
