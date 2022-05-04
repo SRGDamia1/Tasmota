@@ -164,12 +164,13 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
       MESH.lastMessageFromBroker = millis();  // time packets come from the broker
       if (MESH.flags.nodeGotTime == 0) {
         RtcSync("Mesh");
-        TasmotaGlobal.rules_flag.system_boot  = 1; // for now we consider the node booted and let trigger system#boot on RULES
+        // TasmotaGlobal.rules_flag.system_boot  = 1; // for now we consider the node booted and let trigger system#boot on RULES
       }
       MESH.flags.nodeGotTime = 1;
       //Wifi.retry = 0;
-      // Response_P(PSTR("{\"%s\":{\"Time\":1}}"), D_CMND_MESH); //got the time, now we can publish some sensor data
-      // XdrvRulesProcess();
+      AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Time\":1}}"), D_CMND_MESH);
+      Response_P(PSTR("{\"%s\":{\"Time\":1}}"), D_CMND_MESH); //got the time, now we can publish some sensor data
+      XdrvRulesProcess(0);
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Got time packet ..."));
       break;
     case PACKET_TYPE_PEERLIST:
@@ -476,7 +477,8 @@ void MESHstartNode(int32_t _channel, uint8_t _role){ //we need a running broker 
     return;
   }
 
-//  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Node initialized, channel: %u"),wifi_get_channel()); //check if we succesfully set the
+  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Node initialized, channel: %u"),wifi_get_channel());
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Node\":1,\"Channel\":%u,\"Role\":%u}}"), D_CMND_MESH, wifi_get_channel(), _role);
   Response_P(PSTR("{\"%s\":{\"Node\":1,\"Channel\":%u,\"Role\":%u}}"), D_CMND_MESH, wifi_get_channel(), _role);
   XdrvRulesProcess(0);
 
@@ -514,6 +516,7 @@ void MESHstartBroker(void) {       // Must be called after WiFi is initialized!!
     return;
   }
 
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Response: {\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
   Response_P(PSTR("{\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
   XdrvRulesProcess(0);
 //  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker initialized on channel %u"), _channel);
