@@ -219,7 +219,9 @@ void MESHInit(void) {
   MESH.role = ROLE_NONE;
   MESH.packetsAlreadyReceived.reserve(5);
   MESH.peers.reserve(20);
+#ifdef ESP32
   MESH.multiPackets.reserve(MESH_BUFFERS);
+#endif
 
   MESH.sendPacket.counter = 0;
   MESH.sendPacket.chunks = 1;

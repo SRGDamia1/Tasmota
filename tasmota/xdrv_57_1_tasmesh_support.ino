@@ -104,6 +104,7 @@ struct mesh_flags_t {
   uint8_t nodeWantsTimeASAP:1;
 };
 
+#ifdef ESP32
 struct mesh_packet_combined_t {
   mesh_packet_header_t header;
   uint32_t receivedChunks;         // Bitmask for up to 32 chunks
@@ -111,6 +112,7 @@ struct mesh_packet_combined_t {
   // size of each is the size of an individual payload multiplied by the
   // maximum number of packets over which we're willing to split a message
 };
+#endif
 
 struct mesh_first_header_bytes {   // TODO: evaluate random 4-byte-value of pre-packet
   uint8_t raw[15];
@@ -132,7 +134,9 @@ struct {
   std::queue<mesh_packet_t> packetToConsume;  // Queue for the packets to process
   std::vector<mesh_packet_header_t> packetsAlreadySended;  // A reference to ensure packets aren't double-sent
   std::vector<mesh_first_header_bytes> packetsAlreadyReceived;  // A reference to ensure packets aren't double-processed
+#ifdef ESP32
   std::vector<mesh_packet_combined_t> multiPackets;  // Storage for partially assembled split packets
+#endif
 // #ifdef ESP32
 //   std::vector<std::string> lastTeleMsgs;  // for web display of message history
 // #endif //ESP32
