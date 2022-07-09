@@ -38,7 +38,7 @@
 
 // If not selected the default will be Sonoff Mini Template
 #undef MODULE
-#define MODULE USER_MODULE // [Module] Select default module from tasmota_template.h
+#define MODULE USER_MODULE // [Module] Select default module from SMUDGE_SECRET_MQTT_USER_template.h
 
 #undef FALLBACK_MODULE
 
@@ -62,10 +62,10 @@
 // -- Ota -----------------------------------------
 #undef OTA_URL
 #ifdef ESP8266
-#define OTA_URL "http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/firmware/tasmota.bin.gz" // [OtaUrl]
+#define OTA_URL "http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/firmware/SMUDGE_SECRET_MQTT_USER.bin.gz" // [OtaUrl]
 #endif                                                                                  // ESP8266
 #ifdef ESP32
-#define OTA_URL "http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/firmware/tasmota32.bin" // [OtaUrl]
+#define OTA_URL "http://SMUDGE_SECRET_FTP_SERVER/SRGDFiles/firmware/SMUDGE_SECRET_MQTT_USER32.bin" // [OtaUrl]
 #endif                                                                                 // ESP32
 
 // -- MQTT ----------------------------------------
@@ -133,13 +133,13 @@
 #undef MQTT_GRPTOPIC
 
 #ifdef ESP8266
-#define MQTT_GRPTOPIC "tasmotas" // [GroupTopic] MQTT Group topic
+#define MQTT_GRPTOPIC "SMUDGE_SECRET_MQTT_USERs" // [GroupTopic] MQTT Group topic
 // #define MQTT_GRPTOPIC "tasmesh" // [GroupTopic] MQTT Group topic
 #endif                           // ESP8266
 
 #ifdef ESP32
-#define MQTT_GRPTOPIC "tasmotas" // [GroupTopic] MQTT Group topic
-// #define MQTT_GRPTOPIC "tasmotas32" // [GroupTopic] MQTT Group topic
+#define MQTT_GRPTOPIC "SMUDGE_SECRET_MQTT_USERs" // [GroupTopic] MQTT Group topic
+// #define MQTT_GRPTOPIC "SMUDGE_SECRET_MQTT_USERs32" // [GroupTopic] MQTT Group topic
 #endif                             // ESP32
 
 #undef MQTT_POWER_FORMAT
@@ -178,14 +178,18 @@
 #endif
 
 // -- MQTT - Home Assistant Discovery -------------
-#ifdef USE_HOME_ASSISTANT
-#undef USE_HOME_ASSISTANT // Disable Home Assistant Discovery Support (+12k code, +6 bytes mem)
+#ifdef HOME_ASSISTANT_DISCOVERY_ENABLE
+#undef HOME_ASSISTANT_DISCOVERY_ENABLE
+#define HOME_ASSISTANT_DISCOVERY_ENABLE   true   // [SetOption19] Home Assistant Discovery (false = Disable, true = Enable)
 #endif
+// #ifdef USE_HOME_ASSISTANT
+// #undef USE_HOME_ASSISTANT // Disable Home Assistant Discovery Support (+12k code, +6 bytes mem)
+// #endif
 
 // -- MQTT - Tasmota Discovery ---------------------
-#ifndef FIRMWARE_MINIMAL
-#define USE_TASMOTA_DISCOVERY // Enable Tasmota Discovery support (+2k code)
-#endif
+// #ifndef FIRMWARE_MINIMAL
+// #define USE_TASMOTA_DISCOVERY // Enable Tasmota Discovery support (+2k code)
+// #endif
 
 // -- Ping ----------------------------------------
 // #ifndef FIRMWARE_MINIMAL
