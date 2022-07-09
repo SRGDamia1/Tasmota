@@ -33,9 +33,9 @@ While fallback or downgrading is common practice it was never supported due to S
 
 This release will be supported from ESP8266/Arduino library Core version **2.7.4.9** due to reported security and stability issues on previous Core version. This will also support gzipped binaries.
 
-This release will be supported from ESP32/Arduino library Core version **2.0.2.1**.
+This release will be supported from ESP32/Arduino library Core version **2.0.3**.
 
-Support of ESP8266 Core versions before 2.7.4.9 and ESP32 Core versions before 2.0.2 have been removed.
+Support of ESP8266 Core versions before 2.7.4.9 and ESP32 Core versions before 2.0.3 have been removed.
 
 ## Support of TLS
 
@@ -72,29 +72,32 @@ Latest released binaries can be downloaded from
 - http://ota.tasmota.com/tasmota/release
 
 Historical binaries can be downloaded from
-- http://ota.tasmota.com/tasmota/release-11.1.0
+- http://ota.tasmota.com/tasmota/release-12.0.2
 
 The latter links can be used for OTA upgrades too like ``OtaUrl http://ota.tasmota.com/tasmota/release/tasmota.bin.gz``
 
-### ESP32 based
-The following binary downloads have been compiled with ESP32/Arduino library core version **2.0.3**.
+### ESP32, ESP32-C3, ESP32-S2 and ESP32-S3 based
+The following binary downloads have been compiled with ESP32/Arduino library core version **2.0.4**.
 
 - **tasmota32.bin** = The Tasmota version with most drivers including additional sensors and KNX for 4M+ flash.  **RECOMMENDED RELEASE BINARY**
-- **tasmota32c3.bin** = The Tasmota version with most drivers including additional sensors and KNX for ESP32-C3 and 4M+ flash.
+- **tasmota32xy.bin** = The Tasmota version with most drivers including additional sensors and KNX for ESP32-C3/S2/S3 and 4M+ flash.
+- **tasmota32xycdc.bin** = The Tasmota version with most drivers including additional sensors and KNX for ESP32-C3/S2/S3 with serial over embedded USB CDC only and 4M+ flash.
 - **tasmota32solo1.bin** = The Tasmota version with most drivers including additional sensors and KNX for single core ESP32 and 4M+ flash.
 - **tasmota32-AF.bin** to **tasmota32-VN.bin** = The Tasmota version in different languages for 4M+ flash.
-- **tasmota32-ir.bin** = The InfraRed Receiver and transmitter version allowing all available protocols provided by library IRremoteESP8266 but without most other features for 4M+ flash.
-- **tasmota32-display.bin** = The Display version without Energy Monitoring but adds display support for 4M+ flash.
-- **tasmota32-lvgl.bin** = The LVGL version adds Light and Versatile Graphics Library (LVGL) display support for 4M+ flash.
-- **tasmota32-webcam.bin** = The Webcam version adds webcam support for 4M+ flash.
 - **tasmota32-bluetooth.bin** = The Bluetooth version adds BLE support for 4M+ flash.
+- **tasmota32-display.bin** = The Display version without Energy Monitoring but adds display support for 4M+ flash.
+- **tasmota32-ir.bin** = The InfraRed Receiver and transmitter version allowing all available protocols provided by library IRremoteESP8266 but without most other features for 4M+ flash.
+- **tasmota32-lvgl.bin** = The LVGL version adds Light and Versatile Graphics Library (LVGL) display support for 4M+ flash.
+- **tasmota32-nspanel.bin** = The Sonoff NSPanel Smart Scene Wall Switch version with HASPmota display support.
+- **tasmota32-webcam.bin** = The Webcam version adds webcam support for 4M+ flash.
+- **tasmota32-zbbridgepro.bin** - The Sonoff Zigbee Bridge Pro version with CC2652P firmware load support.
 
 Latest released binaries can be downloaded from
 - https://github.com/arendst/Tasmota-firmware/tree/main/release-firmware
 - http://ota.tasmota.com/tasmota32/release
 
 Historical binaries can be downloaded from
-- http://ota.tasmota.com/tasmota32/release-11.1.0
+- http://ota.tasmota.com/tasmota32/release-12.0.2
 
 The latter links can be used for OTA upgrades too like ``OtaUrl http://ota.tasmota.com/tasmota32/release/tasmota32.bin``
 
@@ -104,17 +107,22 @@ The latter links can be used for OTA upgrades too like ``OtaUrl http://ota.tasmo
 
 [Complete list](BUILDS.md) of available feature and sensors.
 
-## Changelog v11.1.0.1
+## Changelog v12.0.2.3
 ### Added
-- Support for Sonoff MS01 soil moisture sensor [#15335](https://github.com/arendst/Tasmota/issues/15335)
-- Support for daisy chaining MAX7219 displays [#15345](https://github.com/arendst/Tasmota/issues/15345)
+- Command ``GlobalTemp2 1..250`` to select Global Temperature source indexed from teleperiod occurance data [#15834](https://github.com/arendst/Tasmota/issues/15834)
+- Command ``GlobalHum2 1..250`` to select Global Humidity source indexed from teleperiod occurance data [#15834](https://github.com/arendst/Tasmota/issues/15834)
+- Command ``GlobalPress2 1..250`` to select Global Pressure source indexed from teleperiod occurance data [#15834](https://github.com/arendst/Tasmota/issues/15834)
+- Support for 5-channel light dimmer driver SM2335 used in SwitchBot Color Bulbs [#15839](https://github.com/arendst/Tasmota/issues/15839)
+- Support for Sonoff POWR3xxD and THR3xxD [#15856](https://github.com/arendst/Tasmota/issues/15856)
+- Support for bistable (latching) relays mixed with monostable relays using GPIO Relay_b or Relay_bi
 
 ### Breaking Changed
 
 ### Changed
+- Tasmota ESP32 Arduino core from v2.0.3 to v2.0.4 [#15940](https://github.com/arendst/Tasmota/issues/15940)
+- Driver DHT v6 consolidation for both ESP8266 and ESP32 to support SI7021, THS01 and MS01 on ESP32 [#15856](https://github.com/arendst/Tasmota/issues/15856)
 
 ### Fixed
-- SCD40 start low power command [#15361](https://github.com/arendst/Tasmota/issues/15361)
-- Improv initial or erase device installation failing to provide Configure WiFi option
+- ESP32 SendMail not working over ethernet [#15794](https://github.com/arendst/Tasmota/issues/15794)
 
 ### Removed
