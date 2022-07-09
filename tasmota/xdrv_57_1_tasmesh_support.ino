@@ -276,7 +276,7 @@ uint8_t MESHcountPeers(void) {
   uint8_t _num = _peernum.total_num;
 #else
   uint8_t _num;
-  uint8_t _numEnc; // wo don't care
+  uint8_t _numEnc; // we don't care
   esp_now_get_cnt_info(&_num, &_numEnc);
 #endif
 //  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Peers %u"), _num);

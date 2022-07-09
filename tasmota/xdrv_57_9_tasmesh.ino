@@ -115,7 +115,7 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
   }
   // for other types of packets (not register or refresh node)
   MESH.lmfap = millis();  // update the last reception from a peer time
-  if (MESHcheckPeerList(MAC) == true){  // if this is a known peer
+  if (MESHcheckPeerList((const uint8_t *)MAC) == true){  // if this is a known peer
     // ^^ NOTE:  MESHcheckPeerList will update _peer.lastMessageFromPeer
     MESH.packetToConsume.push(*_recvPacket);  // add the message to the queue of messages to process
     AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet %d from %s to queue"), MESH.packetToConsume.size(), _srcMAC);
@@ -182,15 +182,9 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
       break;
   }
   // now process packets with deference to who they're intended for
-  //if this is a packet intended for some other node
-  if (memcmp(_recvPacket->receiver, MESH.sendPacket.sender, 6) != 0) { //MESH.sendPacket.sender simply stores the MAC of the node
-    if (ROLE_NODE_SMALL == MESH.role) {
-      return; // a 'small node' does not perform mesh functions
-    }
-    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet to resend ..."));
-    MESH.packetToResend.push(*_recvPacket);  // queue it for re-sending
-    return;
-  } else { // if it IS intended for us
+  // if this is a packet intended for us
+  if (memcmp(_recvPacket->receiver, MESH.sendPacket.sender, 6) == 0)  // MESH.sendPacket.sender simply stores the MAC of the node (ie, our own MAC)
+  {  // if it IS intended for us
     if (_recvPacket->type == PACKET_TYPE_WANTTOPIC) {  // if it's the broker asking for our topic
       MESH.flags.brokerNeedsTopic = 1;  // set a flag for action
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Broker needs topic ..."));
@@ -205,6 +199,11 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
     // MESH.packetsAlreadyReceived.push_back((mesh_packet_header_t*) _recvPacket);
     // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet to consume ..."));
     MESH.packetToConsume.push(*_recvPacket);  // if we get here, queue the packet for action
+  } else if (ROLE_NODE_SMALL != MESH.role) {
+    // if it's intended for some other node, and we're not a 'small node' that does not perform mesh functions
+    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Got packet to resend ..."));
+    MESH.packetToResend.push(*_recvPacket);  // queue it for re-sending
+    return;
   }
 }
 
@@ -218,7 +217,7 @@ void MESHInit(void) {
   MESH.interval = MESH_REFRESH;
   MESH.role = ROLE_NONE;
   // MESH.packetsAlreadyReceived.reserve(5);
-  MESH.peers.reserve(5);
+  MESH.peers.reserve(10);
 #ifdef ESP32
   MESH.multiPackets.reserve(MESH_BUFFERS);
 #endif
@@ -491,7 +490,7 @@ void MESHstartNode(int32_t _channel, uint8_t _role){ //we need a running broker 
   MESHsetKey(MESH.key);
   memcpy(MESH.sendPacket.receiver, MESH.broker, 6);
   WiFi.macAddress(MESH.sendPacket.sender);
-  MESHaddPeer(MESH.broker); //must always be peer 0!! -return code -7 for peer list full
+  MESHaddPeer(MESH.broker); //broker must always be peer 0!! -return code -7 for peer list full
   MESHcountPeers();
   MESH.lastMessageFromBroker = millis();  // Init
   MESH.role = (0 == _role) ? ROLE_NODE_SMALL : ROLE_NODE_FULL;
@@ -613,49 +612,49 @@ void MESHevery50MSecond(void) {
             for (auto it = MESH.multiPackets.begin(); it != MESH.multiPackets.end(); ) {
               mesh_packet_combined_t _packet_combined = *it;
               // iterate through the vector of partially reassembled multi-packet  chunks
-              //  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Append to multipacket"));
-              if (memcmp(_packet_combined.header.sender, MESH.packetToConsume.front().sender, 12) == 0) {  // if the headers match
-                if (_packet_combined.header.counter == MESH.packetToConsume.front().counter) {  // and the message counter mathes
-                  _foundMultiPacket = true;
-                  memcpy(_packet_combined.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
-                  // ^^ copy the payload
-                  bitSet(_packet_combined.receivedChunks, MESH.packetToConsume.front().chunk);
-                  // ^^ set the appropriate bit for the received chunk number
-                  // AddLog(LOG_LEVEL_INFO, PSTR("MSH: Multipacket rcvd chunk mask 0x%08X"), _packet_combined.receivedChunks);
-                  uint32_t _temp = (1 << (uint8_t)MESH.packetToConsume.front().chunks) -1; //example: 1+2+4 == (2^3)-1
-                  //^^ this is a filled bit-mask denoting all possible chunks received of the message for which the packet to consume is a chunk of
-                  // AddLog(LOG_LEVEL_INFO, PSTR("MSH: _temp: %u = %u"),_temp,_packet_combined.receivedChunks);
-                  if (_packet_combined.receivedChunks == _temp) {  // if all of the packets have been received
-                    char * _data = (char*)_packet_combined.raw + strlen((char*)_packet_combined.raw) + 1;
-                    // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish multipacket"));
-                    MqttPublishPayload((char*)_packet_combined.raw, _data); // publish it
-                    it=MESH.multiPackets.erase(it);  // release the storage space
-                    break;
-                  }
+              if (
+              (memcmp(_packet_combined.header.sender, MESH.packetToConsume.front().sender, 12) == 0)  // if the headers match
+              && (_packet_combined.header.counter == MESH.packetToConsume.front().counter)) {  // and the message counter mathes
+                _foundMultiPacket = true;
+                memcpy(_packet_combined.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
+                // ^^ copy the payload
+                bitSet(_packet_combined.receivedChunks, MESH.packetToConsume.front().chunk);
+                // ^^ set the appropriate bit for the received chunk number
+                AddLog(LOG_LEVEL_INFO, PSTR("MSH: Multipacket rcvd chunk mask 0x%08X"), _packet_combined.receivedChunks);
+                uint32_t _temp = (1 << (uint8_t)MESH.packetToConsume.front().chunks) -1; //example: 1+2+4 == (2^3)-1
+                //^^ this is a filled bit-mask denoting all possible chunks received of the message for which the packet to consume is a chunk of
+                AddLog(LOG_LEVEL_INFO, PSTR("MSH: _temp: %u = %u"), _temp, _packet_combined.receivedChunks);
+                AddLog(LOG_LEVEL_INFO, PSTR("MSH: _temp: 0x%08X = 0x%08X"),_temp,_packet_combined.receivedChunks);
+                if (_packet_combined.receivedChunks == _temp) {  // if all of the packets have been received
+                  char * _data = (char*)_packet_combined.raw + strlen((char*)_packet_combined.raw) + 1;
+                  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish multipacket"));
+                  MqttPublishPayload((char *)_packet_combined.raw, _data); // publish it
+                  it=MESH.multiPackets.erase(it);  // release the storage space
                 }
-              } else {
-                ++it;// move to the next reassembly vector
+                break;  // break out after finding the match
               }
-            }
-            if (!_foundMultiPacket) { // if we didn't find any matching packets in the multi-packet re-assembly storage
-              mesh_packet_combined_t _packet;  // create a new re-assembly packet
-              memcpy(_packet.header.sender, MESH.packetToConsume.front().sender, sizeof(_packet.header));
-              memcpy(_packet.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
-              _packet.receivedChunks = 0;
-              bitSet(_packet.receivedChunks, MESH.packetToConsume.front().chunk);
-              MESH.multiPackets.push_back(_packet);  // and push it into the storage vector
-  //            AddLog(LOG_LEVEL_INFO, PSTR("MSH: New multipacket with chunks %u"), _packet.header.chunks);
-            }
-          } else {  // if this is not a multi-packet message, directly deal with it
-  //          AddLog(LOG_LEVEL_INFO, PSTR("MSH: chunk: %u size: %u"), MESH.packetToConsume.front().chunk, MESH.packetToConsume.front().chunkSize);
-  //          if (MESH.packetToConsume.front().chunk==0) AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize);
-            char * _data = (char*)MESH.packetToConsume.front().payload + strlen((char*)MESH.packetToConsume.front().payload) +1;
-  //          AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish packet"));
-            MqttPublishPayload((char*)MESH.packetToConsume.front().payload, _data);
-  //          AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize);
+            ++it;// move to the next reassembly vector
           }
-          break;
+          if (!_foundMultiPacket) { // if we didn't find any matching packets in the multi-packet re-assembly storage
+            mesh_packet_combined_t _packet;  // create a new re-assembly packet
+            memcpy(_packet.header.sender, MESH.packetToConsume.front().sender, sizeof(_packet.header));
+            memcpy(_packet.raw + (MESH.packetToConsume.front().chunk * MESH_PAYLOAD_SIZE), MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
+            _packet.receivedChunks = 0;
+            bitSet(_packet.receivedChunks, MESH.packetToConsume.front().chunk);
+            MESH.multiPackets.push_back(_packet);  // and push it into the storage vector
+            AddLog(LOG_LEVEL_INFO, PSTR("MSH: New multipacket with chunks %u"), _packet.header.chunks);
+          }
+        } else {  // if this is not a multi-packet message, directly deal with it
+          AddLog(LOG_LEVEL_INFO, PSTR("MSH: chunk: %u size: %u"), MESH.packetToConsume.front().chunk, MESH.packetToConsume.front().chunkSize);
+          if (MESH.packetToConsume.front().chunk==0)
+            AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
+          char * _data = (char*)MESH.packetToConsume.front().payload + strlen((char *)MESH.packetToConsume.front().payload) + 1;
+          AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Publish packet"));
+          MqttPublishPayload((char*)MESH.packetToConsume.front().payload, _data);
+          AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload, MESH.packetToConsume.front().chunkSize);
         }
+        break;
+      }
       default:  // NOTE:  time, register, and refresh packet types are handled in the high-priority call back
         AddLogBuffer(LOG_LEVEL_DEBUG, (uint8_t *)&MESH.packetToConsume.front(), MESH.packetToConsume.front().chunkSize +5);
         break;
@@ -691,13 +690,13 @@ void MESHEverySecond(void) {
   }
   uint32_t _peerNumber = _second%45; // get topic from peer every 45 seconds
   if (_peerNumber < MESH.peers.size()) {
-    // if (MESH.peers[_peerNumber].topic[0] == 0) {
-      AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker wants topic from peer %u"), _peerNumber);
-      MESHdemandTopic(_peerNumber);
+    // if (MESH.peers[_peerNumber].topic[0] == 0) {  // SRGD Note:  Request topic regularly as a way of validating connection
+    AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker wants topic from peer %u"), _peerNumber);
+    MESHdemandTopic(_peerNumber);
     // }
   }
-  for (auto it = MESH.peers.begin(); it != MESH.peers.end(); ) {  // check on peers
-    mesh_peer_t _peer=*it;
+  for (auto it = MESH.peers.begin(); it != MESH.peers.end();) {  // check on peers
+    mesh_peer_t _peer = *it;
     if (millis() - _peer.lastMessageFromPeer > 70000) {  // if it's been more than 70s since we heard from the peer
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Peer with MAC %s and topic %s not seen in 70s, removing from list of peers"), _peer.MAC, _peer.topic);
       MESHunsubscribe((char*)&_peer.topic);  // Un-subscribe to the peer's topic
@@ -748,13 +747,15 @@ void MESHevery50MSecond(void) {
         MESHreceiveMQTT(&MESH.packetToConsume.front());
         // NOTE:  No receive buffer!! only single packet messages supported!!
         break;
-      case PACKET_TYPE_PEERLIST:
-        for (uint32_t i = 0; i < MESH.packetToConsume.front().chunkSize; i += 6) {
-          if (memcmp(MESH.packetToConsume.front().payload +i, MESH.sendPacket.sender, 6) == 0) {
-            continue; //do not add myself
-          }
-          if (MESHcheckPeerList(MESH.packetToConsume.front().payload +i) == false) {
-            MESHaddPeer(MESH.packetToConsume.front().payload +i);
+      case PACKET_TYPE_PEERLIST:  // add any previously unknown peers to own list
+        if (MESH.role == ROLE_NODE_FULL) {  // but only if it's a full node, not a "small" node
+          for (uint32_t i = 0; i < MESH.packetToConsume.front().chunkSize; i += 6) {
+            if (memcmp(MESH.packetToConsume.front().payload + i, MESH.sendPacket.sender, 6) == 0) {
+              continue; //do not add myself
+            }
+            if (MESHcheckPeerList(MESH.packetToConsume.front().payload +i) == false) {
+              MESHaddPeer(MESH.packetToConsume.front().payload +i);
+            }
           }
         }
         break;
