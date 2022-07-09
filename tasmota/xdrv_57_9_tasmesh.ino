@@ -81,17 +81,18 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
   mesh_packet_t *_recvPacket = (mesh_packet_t*)packet;
   // register and refresh node packets from a node have a payload of the MAC of the desired broker followed by their own MQTT topid
   if ((_recvPacket->type == PACKET_TYPE_REGISTER_NODE) || (_recvPacket->type == PACKET_TYPE_REFRESH_NODE)) {
+    AddLog(LOG_LEVEL_INFO, PSTR("MSH: Rcvd node register/refresh request with topic %s"), (char *)_recvPacket->payload + 6);
     if (MESHcheckPeerList((const uint8_t *)MAC) == false) { // if it's not an already know peer
       MESHencryptPayload(_recvPacket, 0); //decrypt it and check the payload
       if (memcmp(_recvPacket->payload, MESH.broker, 6) == 0) {  // if the MAC in the payload matches the MAC of the broker (ie, self on ESP32)
         MESHaddPeer((uint8_t*)MAC);  // add the new peer
-//        AddLog(LOG_LEVEL_INFO, PSTR("MSH: Rcvd topic %s"), (char*)_recvPacket->payload + 6);
-//        AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize+5);
+        AddLogBuffer(LOG_LEVEL_INFO,(uint8_t *)&MESH.packetToConsume.front().payload,MESH.packetToConsume.front().chunkSize+5);
         for (auto &_peer : MESH.peers) {  // check all peers on the updated known peer list
           if (memcmp(_peer.MAC, _recvPacket->sender, 6) == 0) {  // when we read the peer who is the sender of the received packet
             strcpy(_peer.topic, (char*)_recvPacket->payload + 6);  // copy the node's MQTT topic to our peer list
             MESHsubscribe((char*)&_peer.topic);  // Subscribe to the peer's topic
             _locked = false;
+            AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: New peer added with mac %s"), _srcMAC);
             return;
           }
         }
@@ -99,16 +100,24 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
         // decript the message just to log its failure
         char _cryptMAC[18];
         ToHex_P(_recvPacket->payload, 6, _cryptMAC, 18, ':');
-        AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Peer %s denied, wrong MAC %s"), _srcMAC, _cryptMAC);
+        AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Node register/refresh %s denied, wrong MAC %s"), _srcMAC, _cryptMAC);
         _locked = false;
         return;
       }
     } else {  // if this *is* a known node
-      if (_recvPacket->type == PACKET_TYPE_REGISTER_NODE) {  //if it's trying to re-register
+      for (auto &_peer : MESH.peers) {  // check all peers on the updated known peer list
+        if (memcmp(_peer.MAC, _recvPacket->sender, 6) == 0 && strcmp(_peer.topic, (char *)_recvPacket->payload + 6) != 0) {  // if topic has changed
+          AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Peer topic has changed from %s to %s"), _peer.topic, (char *)_recvPacket->payload + 6);
+          MESHunsubscribe((char *)&_peer.topic);  // Un-subscribe from the old topic
+          strcpy(_peer.topic, (char *)_recvPacket->payload + 6);  // copy the node's new MQTT topic to our peer list
+          MESHsubscribe((char *)&_peer.topic);  // Subscribe to the peer's new topic
+        }
+      }
+      if (_recvPacket->type == PACKET_TYPE_REGISTER_NODE) {  // if it's trying to re-register - it thinks it's a new node
         // flag that the node is impatient
         MESH.flags.nodeWantsTimeASAP = 1; //this could happen after wake from deepsleep on battery powered device
       } else {
-        // otherwise, just flag that we need to send the time when we get to it
+        // otherwise, just flag that we need to send the time when we get to it on the next interval cycle
         MESH.flags.nodeWantsTime = 1;
       }
     }
@@ -118,7 +127,9 @@ void CB_MESHDataReceived(const uint8_t *MAC, const uint8_t *packet, int len) {
   if (MESHcheckPeerList((const uint8_t *)MAC) == true){  // if this is a known peer
     // ^^ NOTE:  MESHcheckPeerList will update _peer.lastMessageFromPeer
     MESH.packetToConsume.push(*_recvPacket);  // add the message to the queue of messages to process
-    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet %d from %s to queue"), MESH.packetToConsume.size(), _srcMAC);
+    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet %d from %s added to queue"), MESH.packetToConsume.size(), _srcMAC);
+  } else {
+    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Peer %s is unknown, packet %d dropped"), _srcMAC, MESH.packetToConsume.size());
   }
   _locked = false;
 }
@@ -197,7 +208,7 @@ void CB_MESHDataReceived(uint8_t *MAC, uint8_t *packet, uint8_t len) {
     //   }
     // }
     // MESH.packetsAlreadyReceived.push_back((mesh_packet_header_t*) _recvPacket);
-    // AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Packet to consume ..."));
+    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Got packet of type %u to consume ..."), _recvPacket->type);
     MESH.packetToConsume.push(*_recvPacket);  // if we get here, queue the packet for action
   } else if (ROLE_NODE_SMALL != MESH.role) {
     // if it's intended for some other node, and we're not a 'small node' that does not perform mesh functions
@@ -274,7 +285,7 @@ void MESHunsubscribe(char *topic) {
  */
 void MESHconnectMQTT(void){
   for (auto &_peer : MESH.peers) {
-    AddLog(LOG_LEVEL_INFO, PSTR("MSH: Reconnect topic %s"), _peer.topic);
+    AddLog(LOG_LEVEL_INFO, PSTR("MSH: Subscrbing to topic %s for peer "), _peer.topic);
     if (_peer.topic[0] != 0) {
       MESHsubscribe(_peer.topic);
     }
@@ -295,7 +306,7 @@ bool MESHinterceptMQTTonBroker(char* _topic, uint8_t* _data, unsigned int data_l
   if (MESH.role != ROLE_BROKER) { return false; }
 
   char stopic[TOPSZ];
-//  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Intercept topic %s"), _topic);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Intercept topic %s"), _topic);
   for (auto &_peer : MESH.peers) {  // find the node matching the topic
     GetTopic_P(stopic, CMND, _peer.topic, PSTR("")); //cmnd/topic/
     if (strlen(_topic) != strlen(_topic)) {
@@ -381,7 +392,7 @@ bool MESHrouteMQTTtoMESH(const char* _topic, char* _data, bool _retained) {
   MESH.sendPacket.type = PACKET_TYPE_MQTT;
   MESH.sendPacket.chunkSize = MESH_PAYLOAD_SIZE;
   MESH.sendPacket.peerIndex = 0;
-//  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Chunks %u, Counter %u"), MESH.sendPacket.chunks, MESH.sendPacket.counter);
+  AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Chunks %u, Counter %u"), MESH.sendPacket.chunks, MESH.sendPacket.counter);
   size_t _topicSize = strlen(_topic) +1;
   size_t _offsetData = 0;
   while (_bytesLeft > 0) {
@@ -396,16 +407,17 @@ bool MESHrouteMQTTtoMESH(const char* _topic, char* _data, bool _retained) {
       _bytesLeft -= _topicSize;
       _byteLeftInChunk -= _topicSize;
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Topic in payload '%s'"), (char*)MESH.sendPacket.payload);
-//      AddLog(LOG_LEVEL_INFO, PSTR("MSH: After topic -> chunk:%u, pre-size: %u"),MESH.sendPacket.chunk,MESH.sendPacket.chunkSize);
+      AddLog(LOG_LEVEL_INFO, PSTR("MSH: After topic -> chunk:%u, pre-size: %u"),MESH.sendPacket.chunk,MESH.sendPacket.chunkSize);
     }
     if (_byteLeftInChunk > 0) {
       if (_byteLeftInChunk > _bytesLeft) {
-//        AddLog(LOG_LEVEL_INFO, PSTR("MSH: only last chunk bL:%u bLiC:%u oSD:%u"),_bytesLeft,_byteLeftInChunk,_offsetData);
+        AddLog(LOG_LEVEL_INFO, PSTR("MSH: only last chunk bL:%u bLiC:%u oSD:%u"),_bytesLeft,_byteLeftInChunk,_offsetData);
         _byteLeftInChunk = _bytesLeft;
-//        AddLog(LOG_LEVEL_INFO, PSTR("MSH: only last chunk after correction -> chunk:%u, pre-size: %u"),MESH.sendPacket.chunk,MESH.sendPacket.chunkSize);
+        AddLog(
+          LOG_LEVEL_INFO, PSTR("MSH: only last chunk after correction -> chunk:%u, pre-size: %u"),MESH.sendPacket.chunk,MESH.sendPacket.chunkSize);
       }
       if (MESH.sendPacket.chunk > 0) { _topicSize = 0; }
-//      AddLog(LOG_LEVEL_INFO, PSTR("MSH: %u"),_topicSize);
+      AddLog(LOG_LEVEL_INFO, PSTR("MSH: Topic size in chunk %u"),_topicSize);
       memcpy(MESH.sendPacket.payload + _topicSize, _data + _offsetData, _byteLeftInChunk);
       AddLog(LOG_LEVEL_DEBUG, PSTR("MSH:  Data in payload '%s'"), (char*)MESH.sendPacket.payload + _topicSize);
       _offsetData += _byteLeftInChunk;
@@ -413,10 +425,9 @@ bool MESHrouteMQTTtoMESH(const char* _topic, char* _data, bool _retained) {
     }
     MESH.sendPacket.chunkSize += _byteLeftInChunk;
     MESH.packetToResend.push(MESH.sendPacket);
-//    AddLog(LOG_LEVEL_INFO, PSTR("MSH: chunk:%u, size: %u"),MESH.sendPacket.chunk,MESH.sendPacket.chunkSize);
-//    AddLogBuffer(LOG_LEVEL_INFO, (uint8_t*)MESH.sendPacket.payload, MESH.sendPacket.chunkSize);
-    if (MESH.sendPacket.chunk == MESH.sendPacket.chunks) {
-//      AddLog(LOG_LEVEL_INFO, PSTR("MSH: Too many chunks %u"), MESH.sendPacket.chunk +1);
+    AddLog(LOG_LEVEL_INFO, PSTR("MSH: chunk:%u, size: %u"),MESH.sendPacket.chunk,MESH.sendPacket.chunkSize);
+    AddLogBuffer(LOG_LEVEL_INFO, (uint8_t*)MESH.sendPacket.payload, MESH.sendPacket.chunkSize);
+    if (MESH.sendPacket.chunk == MESH.sendPacket.chunks) { AddLog(LOG_LEVEL_INFO, PSTR("MSH: Too many chunks %u"), MESH.sendPacket.chunk +1);
     }
 
     SHOW_FREE_MEM(PSTR("MESHrouteMQTTtoMESH"));
@@ -520,7 +531,7 @@ void MESHstartBroker(void) {       // Must be called after WiFi is initialized!!
   AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Rule Trigger: {\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
   Response_P(PSTR("{\"%s\":{\"Broker\":1,\"Channel\":%u}}"), D_CMND_MESH, _channel);
   XdrvRulesProcess(0);
-//  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker initialized on channel %u"), _channel);
+  AddLog(LOG_LEVEL_INFO, PSTR("MSH: Broker initialized on channel %u"), _channel);
   esp_now_register_send_cb(CB_MESHDataSent);
   esp_now_register_recv_cb(CB_MESHDataReceived);
   MESHsetKey(MESH.key);
@@ -596,7 +607,7 @@ void MESHevery50MSecond(void) {
         break;
       case  PACKET_TYPE_MQTT:      // Redirected MQTT from node in packet [char* _space_ char*]
         {
-          // AddLog(LOG_LEVEL_INFO, PSTR("MSH: Received node output '%s'"), (char*)MESH.packetToConsume.front().payload);
+        AddLog(LOG_LEVEL_INFO, PSTR("MSH: Received node output '%s'"), (char*)MESH.packetToConsume.front().payload);
           // bump up the time of the last message from this peer
           uint32_t idx = 0;
           for (auto &_peer : MESH.peers){
@@ -608,6 +619,7 @@ void MESHevery50MSecond(void) {
             idx++;
           }
           if (MESH.packetToConsume.front().chunks > 1) {  // if we need to reassemble multiple packets into a single MQTT message
+            AddLog(LOG_LEVEL_INFO, PSTR("MSH: Got portion of multipacket"));
             bool _foundMultiPacket = false;
             for (auto it = MESH.multiPackets.begin(); it != MESH.multiPackets.end(); ) {
               mesh_packet_combined_t _packet_combined = *it;
@@ -660,7 +672,7 @@ void MESHevery50MSecond(void) {
         break;
     }
     MESH.packetToConsume.pop();  // remove the now consumed packet from the queue
-//    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Consumed one packet %u"), (char*)MESH.packetToConsume.size());
+    AddLog(LOG_LEVEL_DEBUG, PSTR("MSH: Consumed one packet %u"), (char*)MESH.packetToConsume.size());
   }
 }
 
