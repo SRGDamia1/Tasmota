@@ -1561,7 +1561,7 @@ void SetModuleType(void)
 bool FlashPin(uint32_t pin)
 {
 #if defined(ESP32) && CONFIG_IDF_TARGET_ESP32C3
-  return (pin > 10) && (pin < 18);        // ESP32C3 has GPIOs 11-17 reserved for Flash
+  return (((pin > 10) && (pin < 12)) || ((pin > 13) && (pin < 18)));  // ESP32C3 has GPIOs 11-17 reserved for Flash, with some boards GPIOs 12 13 are useable
 #elif defined(CONFIG_IDF_TARGET_ESP32S2) || defined(CONFIG_IDF_TARGET_ESP32S3)
   return (pin > 21) && (pin < 33);        // ESP32S2 skip 22-32
 #elif defined(CONFIG_IDF_TARGET_ESP32)
@@ -1574,7 +1574,7 @@ bool FlashPin(uint32_t pin)
 bool RedPin(uint32_t pin) // pin may be dangerous to change, display in RED in template console
 {
 #if defined(ESP32) && CONFIG_IDF_TARGET_ESP32C3
-  return false;     // no red pin on ESP32C3
+  return (12==pin)||(13==pin);  // ESP32C3: GPIOs 12 13 are usually used for Flash (mode QIO/QOUT)
 #elif defined(CONFIG_IDF_TARGET_ESP32S2)
   return false;     // no red pin on ESP32S3
 #elif defined(CONFIG_IDF_TARGET_ESP32S3)
@@ -2324,6 +2324,14 @@ void I2cScan(uint32_t bus) {
   // I2C_SCL_HELD_LOW_AFTER_READ 2 = I2C bus error. SCL held low beyond client clock stretch time
   // I2C_SDA_HELD_LOW            3 = I2C bus error. SDA line held low by client/another_master after n bits
   // I2C_SDA_HELD_LOW_AFTER_INIT 4 = line busy. SDA again held low by another device. 2nd master?
+  //                             5 = bus busy. Timeout
+  // https://www.arduino.cc/reference/en/language/functions/communication/wire/endtransmission/
+  // 0: success
+  // 1: data too long to fit in transmit buffer
+  // 2: received NACK on transmit of address
+  // 3: received NACK on transmit of data
+  // 4: other error
+  // 5: timeout
 
   uint8_t error = 0;
   uint8_t address = 0;
@@ -2415,7 +2423,12 @@ bool I2cSetDevice(uint32_t addr, uint32_t bus) {
     return false;       // If already active report as not present;
   }
   myWire.beginTransmission((uint8_t)addr);
-  return (0 == myWire.endTransmission());
+//  return (0 == myWire.endTransmission());
+  uint32_t err = myWire.endTransmission();
+  if (err && (err != 2)) {
+    AddLog(LOG_LEVEL_DEBUG, PSTR("I2C: Error %d at 0x%02x"), err, addr);
+  }
+  return (0 == err);
 }
 #endif  // USE_I2C
 
@@ -2473,7 +2486,7 @@ void SyslogAsync(bool refresh) {
         if (!WifiHostByName(SettingsText(SET_SYSLOG_HOST), temp_syslog_host_addr)) {  // If sleep enabled this might result in exception so try to do it once using hash
           TasmotaGlobal.syslog_level = 0;
           TasmotaGlobal.syslog_timer = SYSLOG_TIMER;
-          AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_APPLICATION D_RETRY_IN " %d " D_UNIT_SECOND), SYSLOG_TIMER);
+          AddLog(LOG_LEVEL_INFO, PSTR("SLG: " D_RETRY_IN " %d " D_UNIT_SECOND), SYSLOG_TIMER);
           return;
         }
         syslog_host_hash = current_hash;
@@ -2482,7 +2495,7 @@ void SyslogAsync(bool refresh) {
       if (!PortUdp.beginPacket(syslog_host_addr, Settings->syslog_port)) {
         TasmotaGlobal.syslog_level = 0;
         TasmotaGlobal.syslog_timer = SYSLOG_TIMER;
-        AddLog(LOG_LEVEL_INFO, PSTR(D_LOG_APPLICATION D_SYSLOG_HOST_NOT_FOUND ". " D_RETRY_IN " %d " D_UNIT_SECOND), SYSLOG_TIMER);
+        AddLog(LOG_LEVEL_INFO, PSTR("SLG: " D_SYSLOG_HOST_NOT_FOUND ". " D_RETRY_IN " %d " D_UNIT_SECOND), SYSLOG_TIMER);
         return;
       }
 

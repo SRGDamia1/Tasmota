@@ -96,6 +96,29 @@
 
 const uint32_t VERSION_MARKER[] PROGMEM = { 0x5AA55AA5, 0xFFFFFFFF, 0xA55AA55A };
 
+struct WIFI {
+  uint32_t last_event = 0;                 // Last wifi connection event
+  uint32_t downtime = 0;                   // Wifi down duration
+  uint16_t link_count = 0;                 // Number of wifi re-connect
+  uint8_t counter;
+  uint8_t retry_init;
+  uint8_t retry;
+  uint8_t max_retry;
+  uint8_t status;
+  uint8_t config_type = 0;
+  uint8_t config_counter = 0;
+  uint8_t scan_state;
+  uint8_t bssid[6];
+  int8_t best_network_db;
+  uint8_t wifiTest = WIFI_NOT_TESTING;
+  uint8_t wifi_test_counter = 0;
+  uint16_t save_data_counter = 0;
+  uint8_t old_wificonfig = MAX_WIFI_OPTION; // means "nothing yet saved here"
+  bool wifi_test_AP_TIMEOUT = false;
+  bool wifi_Test_Restart = false;
+  bool wifi_Test_Save_SSID2 = false;
+} Wifi;
+
 typedef struct {
   uint16_t      valid;                     // 280  (RTC memory offset 100 - sizeof(RTCRBT))
   uint8_t       fast_reboot_count;         // 282
@@ -110,8 +133,8 @@ typedef struct {
   uint16_t      valid;                     // 290  (RTC memory offset 100)
   uint8_t       oswatch_blocked_loop;      // 292
   uint8_t       ota_loader;                // 293
-  uint32_t      energy_kWhtoday;           // 294
-  uint32_t      energy_kWhtotal;           // 298
+  uint32_t      ex_energy_kWhtoday;        // 294
+  uint32_t      ex_energy_kWhtotal;        // 298
   volatile uint32_t pulse_counter[MAX_COUNTERS];  // 29C - See #9521 why volatile
   power_t       power;                     // 2AC
   EnergyUsage   energy_usage;              // 2B0
@@ -221,9 +244,7 @@ struct TasmotaGlobal_t {
 
   power_t power;                            // Current copy of Settings->power
   power_t rel_inverted;                     // Relay inverted flag (1 = (0 = On, 1 = Off))
-#ifdef USE_BISTABLE_RELAY_SUPPORT
   power_t rel_bistable;                     // Relay bistable bitmap
-#endif  // USE_BISTABLE_RELAY_SUPPORT
   power_t last_power;                       // Last power set state
   power_t blink_power;                      // Blink power state
   power_t blink_powersave;                  // Blink start power save state

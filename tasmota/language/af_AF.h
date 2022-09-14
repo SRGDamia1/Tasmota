@@ -624,12 +624,13 @@
 #define D_SENSOR_DS18X20       "DS18x20"
 #define D_SENSOR_I2C_SCL       "I2C SCL"
 #define D_SENSOR_I2C_SDA       "I2C SDA"
-#define D_SENSOR_I2S_OUT_DATA  "I2S Out Data"
-#define D_SENSOR_I2S_OUT_CLK   "I2S Out Clk"
-#define D_SENSOR_I2S_OUT_SLCT  "I2S Out Slct"
-#define D_SENSOR_I2S_IN_DATA   "I2S In Data"
-#define D_SENSOR_I2S_IN_CLK    "I2S In Clk"
-#define D_SENSOR_I2S_IN_SLCT   "I2S In Slct"
+#define D_SENSOR_I2S_MCLK      "I2S MCLK"
+#define D_SENSOR_I2S_BCLK      "I2S BCLK"
+#define D_SENSOR_I2S_WS_IN     "I2S BCLK IN"
+#define D_SENSOR_I2S_WS        "I2S WS"
+#define D_SENSOR_I2S_BCLK_IN   "I2S WS IN"
+#define D_SENSOR_I2S_DIN       "I2S DIN"
+#define D_SENSOR_I2S_DOUT      "I2S DOUT"
 #define D_SENSOR_WS2812        "WS2812"
 #define D_SENSOR_DFR562        "MP3 Speler"
 #define D_SENSOR_DFR562_BUSY   "MP3 Bezet"
@@ -672,6 +673,8 @@
 #define D_SENSOR_HPMA_TX       "HPMA Tx"
 #define D_SENSOR_SBR_RX        "SerBr Rx"
 #define D_SENSOR_SBR_TX        "SerBr Tx"
+#define D_SENSOR_MBR_TX        "ModBr Tx"
+#define D_SENSOR_MBR_RX        "ModBr Rx"
 #define D_SENSOR_SR04_TRIG     "SR04 Tri/TX"
 #define D_SENSOR_SR04_ECHO     "SR04 Ech/RX"
 #define D_SENSOR_SDM72_TX      "SDM72 Tx"
@@ -878,7 +881,7 @@
 #define D_GPIO_SHIFT595_RCLK   "74x595 RCLK"
 #define D_GPIO_SHIFT595_OE     "74x595 OE"
 #define D_GPIO_SHIFT595_SER    "74x595 SER"
-#define D_SENSOR_CM11_TX       "CM110x TX" 
+#define D_SENSOR_CM11_TX       "CM110x TX"
 #define D_SENSOR_CM11_RX       "CM110x RX"
 #define D_SENSOR_FLOWRATEMETER "Flowrate"
 
@@ -931,6 +934,7 @@
 #define D_UNIT_WATT_METER_QUADRAT "W/m²"
 #define D_UNIT_LITER_PER_MINUTE "l/min"
 #define D_UNIT_CUBICMETER_PER_HOUR "m³/h"
+#define D_UNIT_CUBIC_METER "m³"
 
 #define D_NEW_ADDRESS          "Setting address to"
 #define D_OUT_OF_RANGE         "Out of Range"
@@ -1073,7 +1077,9 @@
 #define D_FP_UNKNOWNERROR "Fout"              // Any other error
 
 // xsns_96_flowratemeter.ino
-#define D_FLOWRATEMETER_NAME "Flowmeter"
+#define D_FLOWRATEMETER_NAME "Flowrate"
+#define D_FLOWRATEMETER_AMOUNT_TODAY "Amount Today"
+#define D_FLOWRATEMETER_DURATION_TODAY "Duration Today"
 
 // xsns_83_neopool.ino
 #define D_NEOPOOL_MACH_NONE               "NeoPool"           // Machine names

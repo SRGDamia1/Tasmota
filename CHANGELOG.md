@@ -3,18 +3,94 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased] - Development
 
-## [12.0.2.3]
+## [12.1.1.2]
 ### Added
-- Support for Sonoff POWR3xxD and THR3xxD (#15856)
-- Support for bistable (latching) relays mixed with monostable relays using GPIO Relay_b or Relay_bi
+- Berry has persistent MQTT subscriptions: auto-subscribe at (re)connection
+- Berry automated solidification of code
+- Support of optional file calib.dat on ADE7953 based energy monitors like Shelly EM (#16486)
 
 ### Changed
-- Driver DHT v6 consolidation for both ESP8266 and ESP32 to support SI7021, THS01 and MS01 on ESP32 (#15856)
-- Tasmota ESP32 Arduino core from v2.0.3 to v2.0.4 (#15940)
 
 ### Fixed
 
 ### Removed
+
+## [12.1.1.1] 20220910
+### Added
+- Support for SGP40 gas and air quality sensor (#16341)
+- Support for Modbus writing using ModbusBridge by JeroenSt (#16351)
+- Support for Ethernet in ESP32 safeboot firmware (#16388)
+- Flowrate meter flow amount/duration, show values in table format (#16385)
+- Zigbee prepare for Green Power support (#16407)
+- Command ``SetOption146 1`` to enable display of ESP32 internal temperature
+- Support for DFRobot SEN0390 V30B ambient light sensor (#16105)
+- Command ``DspSpeed 2..127`` to control message rotation speed on display of POWR3xxD and THR3xxD
+- Command ``DspLine<1|2> <index>,<unit>,<index>,<unit>,...`` to select message(s) on display of POWR3xxD and THR3xxD
+
+### Changed
+- TasmotaModbus library from v3.5.0 to v3.6.0 (#16351)
+- Button debouncing V3 by adopting switch debounce code (#16339)
+- Thermostat max allowed temperature from 100 to 200C (#16363)
+- Using command ``SerialBuffer`` raise max allowed buffer size to 2048 characters (#16374)
+
+### Fixed
+- Removed whitespace from JSON values with no decimals (#16365)
+
+## [12.1.0.1] 20220825
+### Added
+- Zigbee device plugin mechanism with commands ``ZbLoad``, ``ZbUnload`` and ``ZbLoadDump`` (#16252)
+- ESP32-S3 support for internal temperature sensor
+- Command ``StatusRetain`` (#11109)
+
+### Changed
+- ESP32 NimBLE library from v1.3.6 to v1.4.0
+
+## [Released]
+
+## [12.1.1] 20220825
+- Release Patricia
+
+### Fixed
+- RTC not detected when lights are present (#16242)
+- DNS lookup for .local domains (#16273)
+- Button response delay regression from v12.0.2.4 (#16319)
+- Lost module name in GUI regression from v12.0.2.4 - 20220803 (#16324)
+
+## [12.1.0] 20220818
+- Release Patricia
+
+## [12.0.2.4] 20220818
+### Added
+- Command ``SetOption45 1..250`` to change default bistable latching relay pulse length of 40 milliseconds
+- Support for Modbus bridge adding commands ``ModbusSend``, ``ModbusBaudrate`` and ``ModbusSerialConfig`` (#16013)
+- Support for multiple ``IRsend`` GPIOs (#16138)
+- Zigbee added recording of when the battery was last reported (#16146)
+- Zigbee add Battery auto-probe (can be disabled with ``SetOption143 1``) (#16148)
+- Zigbee include "BatteryPercentage" in all messages
+- Commands ``WifiScan`` and ``WifiTest`` (#16141)
+- Support for Catalan language translations by Albert Gonzalez (#16145)
+- Zigbee ``SetOption144 1`` includes a timestamp in `ZbReceived` messages
+
+### Changed
+- ESP32 LVGL library from v8.2.0 to v8.3.0 (#16019)
+- Tasmota ESP32 Arduino core from v2.0.4 to v2.0.4.1 (#16110)
+- TasmotaModbus library from v3.4.0 to v3.5.0 (#16245)
+
+### Fixed
+- Restore EnergyToday after using command ``restart 2`` and power cycle (#16118)
+- Fixed IR crash on ESP32 (#16173)
+- Zigbee fix Tuya for writing attributes
+
+## [12.0.2.3] 20220716
+### Added
+- Support for Sonoff POWR3xxD and THR3xxD (#15856)
+- Support for bistable (latching) relays mixed with monostable relays using GPIO Relay_b or Relay_bi as used by Sonoff POWR320D and THR320D
+- ESP32 Support for Ultra Low Power (ULP) coprocessor via Berry by Christian Staars (#15916)
+- Command ``Sleep2 !`` to cancel pending one-shot speed setting (#15954)
+
+### Changed
+- Driver DHT v6 consolidation for both ESP8266 and ESP32 to support SI7021, THS01 and MS01 on ESP32 (#15856)
+- Tasmota ESP32 Arduino core from v2.0.3 to v2.0.4 (#15940)
 
 ## [12.0.2.2]
 ### Added
@@ -28,8 +104,6 @@ All notable changes to this project will be documented in this file.
 
 ### Fixed
 - ESP32 SendMail not working over ethernet (#15794)
-
-## [Released]
 
 ## [12.0.2] 20220620
 - Release Paul

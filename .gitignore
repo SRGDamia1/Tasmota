@@ -29,6 +29,8 @@ tasmota*.map
 tasmota*.map.gz
 # platformio_override.ini
 # platformio_tasmota_cenv.ini
+lib/libesp32/berry/generate/*
+lib/libesp32/berry/berry
 secrets
 
 ## Visual Studio Code specific ######

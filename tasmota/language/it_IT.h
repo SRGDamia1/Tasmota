@@ -28,7 +28,7 @@
  * Use online command StateText to translate ON, OFF, HOLD and TOGGLE.
  * Use online command Prefix to translate cmnd, stat and tele.
  *
- * Updated until v9.4.0.1 - Last update 30.05.2022
+ * Updated until v9.4.0.1 - Last update 31.08.2022
 \*********************************************************************/
 
 #define LANGUAGE_MODULE_NAME         // Enable to display "Module Generic" (ie Spanish), Disable to display "Generic Module" (ie English)
@@ -622,14 +622,15 @@
 #define D_SENSOR_SI7021                 "SI7021"
 #define D_SENSOR_MS01                   "MS01"
 #define D_SENSOR_DS18X20                "DS18x20"
-#define D_SENSOR_I2C_SCL                "I2C SCL"
-#define D_SENSOR_I2C_SDA                "I2C SDA"
-#define D_SENSOR_I2S_OUT_DATA           "I2S - Dati out"
-#define D_SENSOR_I2S_OUT_CLK            "I2S - Clk out"
-#define D_SENSOR_I2S_OUT_SLCT           "I2S - Sel. out"
-#define D_SENSOR_I2S_IN_DATA            "I2S - Dati in"
-#define D_SENSOR_I2S_IN_CLK             "I2S - Clk in"
-#define D_SENSOR_I2S_IN_SLCT            "I2S - Sel. in"
+#define D_SENSOR_I2C_SCL                "I2C - SCL"
+#define D_SENSOR_I2C_SDA                "I2C - SDA"
+#define D_SENSOR_I2S_MCLK               "I2S - MCLK"
+#define D_SENSOR_I2S_BCLK               "I2S - BCLK"
+#define D_SENSOR_I2S_WS_IN              "I2S - BCLK IN"
+#define D_SENSOR_I2S_WS                 "I2S - WS"
+#define D_SENSOR_I2S_BCLK_IN            "I2S - WS IN"
+#define D_SENSOR_I2S_DIN                "I2S - DIN"
+#define D_SENSOR_I2S_DOUT               "I2S - DOUT"
 #define D_SENSOR_WS2812                 "WS2812"
 #define D_SENSOR_DFR562                 "Riproduttore MP3"
 #define D_SENSOR_DFR562_BUSY            "MP3 occupato"
@@ -672,6 +673,8 @@
 #define D_SENSOR_HPMA_TX                "HPMA - TX"
 #define D_SENSOR_SBR_RX                 "SerBr - RX"
 #define D_SENSOR_SBR_TX                 "SerBr - TX"
+#define D_SENSOR_MBR_TX                 "ModBr - TX"
+#define D_SENSOR_MBR_RX                 "ModBr - RX"
 #define D_SENSOR_SR04_TRIG              "SR04 Tri - TX"
 #define D_SENSOR_SR04_ECHO              "SR04 Ech - RX"
 #define D_SENSOR_SDM72_TX               "SDM72 - TX"
@@ -931,6 +934,7 @@
 #define D_UNIT_WATT_METER_QUADRAT         "W/m²"
 #define D_UNIT_LITER_PER_MINUTE           "l/min"
 #define D_UNIT_CUBICMETER_PER_HOUR        "m³/ora"
+#define D_UNIT_CUBIC_METER                "m³"
 
 #define D_NEW_ADDRESS          "Imposta indirizzo a"
 #define D_OUT_OF_RANGE         "Fuori intervallo"
@@ -1073,7 +1077,9 @@
 #define D_FP_UNKNOWNERROR        "Errore"                         // Any other error
 
 // xsns_96_flowratemeter.ino
-#define D_FLOWRATEMETER_NAME "Portata"
+#define D_FLOWRATEMETER_NAME              "Portata"
+#define D_FLOWRATEMETER_AMOUNT_TODAY      "Valore odierno"
+#define D_FLOWRATEMETER_DURATION_TODAY    "Durata odierna"
 
 // xsns_83_neopool.ino
 #define D_NEOPOOL_MACH_NONE               "NeoPool"             // Machine names
